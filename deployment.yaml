@@ -1,12 +1,11 @@
 apiVersion: apps/v1
-kind: Deployment
+kind: DaemonSet
 metadata:
   name: ros2-smoke
   labels:
     app.kubernetes.io/name: ros2-smoke
     app.kubernetes.io/part-of: spot
 spec:
-  replicas: 1
   selector:
     matchLabels:
       app.kubernetes.io/name: ros2-smoke
