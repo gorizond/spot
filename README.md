@@ -64,19 +64,25 @@ For the current SpotMicro wiring, **CH6–CH9 are empty** (leave `ch6-joint..ch9
 kubectl -n spot-system exec -it ds/ros2-smoke -c servo-driver -- bash
 ```
 
-3) (Optional) Reset targets to home (0.0):
+3) Source ROS 2 environment (required for `rclpy` / `ros2` commands):
+
+```bash
+source /opt/ros/kilted/setup.bash
+```
+
+4) (Optional) Reset targets to home (0.0):
 
 ```bash
 python3 /opt/spot/spot_cli.py --repeat 1 home
 ```
 
-4) Arm (does not move anything until you `set` a joint):
+5) Arm (does not move anything until you `set` a joint):
 
 ```bash
 python3 /opt/spot/spot_cli.py --repeat 1 arm
 ```
 
-5) Enable + move one joint with small steps (calibration-friendly):
+6) Enable + move one joint with small steps (calibration-friendly):
 
 ```bash
 python3 /opt/spot/spot_cli.py --repeat 1 set-us rf_hip=1500
@@ -84,7 +90,7 @@ python3 /opt/spot/spot_cli.py --repeat 1 set-us rf_hip=1510
 python3 /opt/spot/spot_cli.py --repeat 1 set-us rf_hip=1500
 ```
 
-6) Disarm when done:
+7) Disarm when done (note: may drop torque if `DISARM_FULL_OFF=1`):
 
 ```bash
 python3 /opt/spot/spot_cli.py disarm
@@ -95,6 +101,68 @@ If something goes wrong:
 ```bash
 python3 /opt/spot/spot_cli.py estop
 ```
+
+## Stand + micro-steps
+
+After calibration, a conservative **stand** pose is:
+
+```bash
+python3 /opt/spot/spot_cli.py --repeat 1 stand
+```
+
+Defaults (override via flags or env `STAND_HIP/STAND_UPPER/STAND_LOWER`):
+
+- `hip=0.02`
+- `upper=0.05`
+- `lower=0.05`
+
+One-leg micro-step (lift/return one leg by moving `*_lower`):
+
+```bash
+python3 /opt/spot/spot_cli.py --repeat 1 step lh
+```
+
+Repeat micro-steps (in-place crawl):
+
+```bash
+python3 /opt/spot/spot_cli.py --repeat 1 walk --steps 3
+```
+
+Tune lift amplitude and timing (start small):
+
+```bash
+python3 /opt/spot/spot_cli.py --repeat 1 walk --steps 1 --lift 0.05 --lift-hold 0.2 --down-hold 0.2
+```
+
+(Experimental) add a small hip swing while the leg is lifted:
+
+```bash
+python3 /opt/spot/spot_cli.py --repeat 1 walk --steps 1 --hip-swing 0.03
+```
+
+## CHAMP gait (walk via `/cmd_vel`)
+
+This uses CHAMP (model-based gait controller) and bridges its `joint_states` to the low-level `servo-driver`.
+
+Build the CHAMP image and make it available to the cluster as `spot-champ:local`:
+
+```bash
+docker build -t spot-champ:local -f docker/champ/Dockerfile .
+```
+
+Then, drive the gait by publishing `/cmd_vel` (start small):
+
+```bash
+kubectl -n spot-system exec -it ds/ros2-smoke -c champ-controller -- bash
+source /opt/ros/kilted/setup.bash
+[ -f /ws/install/setup.bash ] && source /ws/install/setup.bash
+ros2 topic pub /cmd_vel geometry_msgs/msg/Twist '{linear: {x: 0.05}}' -r 2
+```
+
+Notes:
+
+- `champ-bridge` publishes servo targets only when `servo-driver` is `armed=true`.
+- Tune bridge scaling via env on `champ-bridge`: `CHAMP_GAIN`, `CHAMP_*_RANGE_RAD`, `STAND_*`.
 
 ## Verify
 

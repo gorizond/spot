@@ -71,6 +71,57 @@ spec:
             - name: spot-node-label-config
               mountPath: /opt/spot
               readOnly: true
+        - name: champ-controller
+          image: spot-champ:local
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: PYTHONUNBUFFERED
+              value: "1"
+          command: ["bash", "-lc"]
+          args:
+            - |
+              set -eo pipefail
+              source /opt/ros/kilted/setup.bash
+              if [ -f /ws/install/setup.bash ]; then
+                source /ws/install/setup.bash
+              fi
+              exec ros2 launch champ_bringup bringup.launch.py \
+                rviz:=false use_sim_time:=false gazebo:=false \
+                description_path:=/opt/spot/champ/spotmicroai.urdf.xacro \
+                joints_map_path:=/opt/spot/champ/joints_ros2.yaml \
+                links_map_path:=/opt/spot/champ/links_ros2.yaml \
+                gait_config_path:=/opt/spot/champ/gait_ros2.yaml \
+                publish_joint_states:=true publish_joint_control:=false
+          volumeMounts:
+            - name: spot-node-label-config
+              mountPath: /opt/spot
+              readOnly: true
+        - name: champ-bridge
+          image: spot-champ:local
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: PYTHONUNBUFFERED
+              value: "1"
+            - name: CHAMP_GAIN
+              value: "0.25"
+            - name: CHAMP_BRIDGE_HZ
+              value: "50"
+            - name: STAND_HIP
+              value: "0.02"
+            - name: STAND_UPPER
+              value: "0.05"
+            - name: STAND_LOWER
+              value: "0.05"
+          command: ["bash", "-lc"]
+          args:
+            - |
+              set -eo pipefail
+              source /opt/ros/kilted/setup.bash
+              exec python3 /opt/spot/champ_bridge.py
+          volumeMounts:
+            - name: spot-node-label-config
+              mountPath: /opt/spot
+              readOnly: true
         - name: servo-driver
           image: ros:kilted-ros-base
           imagePullPolicy: IfNotPresent
@@ -119,6 +170,23 @@ spec:
           configMap:
             name: spot-node-label-config
             defaultMode: 0555
+            items:
+              - key: node_label_config.py
+                path: node_label_config.py
+              - key: servo_driver.py
+                path: servo_driver.py
+              - key: spot_cli.py
+                path: spot_cli.py
+              - key: champ_bridge.py
+                path: champ_bridge.py
+              - key: spotmicroai.urdf.xacro
+                path: champ/spotmicroai.urdf.xacro
+              - key: joints_ros2.yaml
+                path: champ/joints_ros2.yaml
+              - key: links_ros2.yaml
+                path: champ/links_ros2.yaml
+              - key: gait_ros2.yaml
+                path: champ/gait_ros2.yaml
         - name: i2c-1
           hostPath:
             path: /dev/i2c-1
