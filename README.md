@@ -23,6 +23,12 @@ Pods are scheduled only on nodes matching:
 - `kubernetes.io/arch=arm64`
 - `gorizond.io/robot=true`
 
+## Hardware notes (power)
+
+- Power the RPi4 from a dedicated `5.1–5.2V` regulator (>= `3A`), ideally from the 2S battery directly.
+- Keep servo power (`PCA9685 V+` / servos) on a separate `6V` BEC; tie grounds at a star point.
+- Brownouts often show up as boot-loops; measure 5V at the GPIO 5V/GND pins under load.
+
 ## Deploy with Fleet
 
 Create a Fleet `GitRepo` in your Fleet workspace (e.g. `workspace-negashev`) pointing to this repository and target your robot cluster.
@@ -144,7 +150,14 @@ python3 /opt/spot/spot_cli.py --repeat 1 walk --steps 1 --hip-swing 0.03
 
 This uses CHAMP (model-based gait controller) and bridges its `joint_states` to the low-level `servo-driver`.
 
-Build the CHAMP image and make it available to the cluster as `spot-champ:local`:
+### Image
+
+By default, the DaemonSet uses `ghcr.io/gorizond/spot-champ:main` (built and pushed by GitHub Actions in this repo).
+
+- Tags: `main` (default branch) and `sha-<short>` (per-commit, immutable).
+- If your package is private, configure an `imagePullSecret` for GHCR.
+
+To build locally instead, edit `deployment.yaml` back to `spot-champ:local` and run:
 
 ```bash
 docker build -t spot-champ:local -f docker/champ/Dockerfile .

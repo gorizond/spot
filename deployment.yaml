@@ -72,8 +72,8 @@ spec:
               mountPath: /opt/spot
               readOnly: true
         - name: champ-controller
-          image: spot-champ:local
-          imagePullPolicy: IfNotPresent
+          image: ghcr.io/gorizond/spot-champ:main
+          imagePullPolicy: Always
           env:
             - name: PYTHONUNBUFFERED
               value: "1"
@@ -97,8 +97,8 @@ spec:
               mountPath: /opt/spot
               readOnly: true
         - name: champ-bridge
-          image: spot-champ:local
-          imagePullPolicy: IfNotPresent
+          image: ghcr.io/gorizond/spot-champ:main
+          imagePullPolicy: Always
           env:
             - name: PYTHONUNBUFFERED
               value: "1"
