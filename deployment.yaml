@@ -96,6 +96,8 @@ spec:
               value: "200"
             - name: SAFE_MIN_US
               value: "100"
+            - name: SAFE_MAX_US
+              value: "3000"
             - name: START_ARMED
               value: "0"
             - name: DISARM_FULL_OFF
