@@ -6,12 +6,16 @@ This repo is intentionally minimal.
 
 ## What runs
 
-`deployment.yaml` deploys a DaemonSet (one pod per robot node) that:
+`deployment.yaml` deploys a DaemonSet (one pod per robot node) with:
 
-- reads **Kubernetes Node labels** of *its own node* (RBAC-enabled)
-- converts them into a PCA9685 servo mapping
-- publishes mapping to ROS 2 topic `/spot/config/servo_map`
-- reacts to label changes via Kubernetes **watch** (no pod restart)
+- `node-label-config`: reads **Kubernetes Node labels** of *its own node* (RBAC-enabled), converts them into a PCA9685 servo mapping, and publishes it to `/spot/config/servo_map` (reacts to label changes via watch; no pod restart).
+- `servo-driver`: subscribes to `/spot/config/servo_map`, drives **PCA9685** over I2C (`/dev/i2c-1`), accepts JSON commands on `/spot/cmd/servo`, and publishes status to `/spot/state/servo`.
+
+Safety defaults:
+
+- starts **disarmed** (`START_ARMED=0`)
+- clamps each joint to `min/center/max` from node labels
+- slew-rate limiting (`MAX_SLEW_US_PER_S`)
 
 Pods are scheduled only on nodes matching:
 
@@ -49,13 +53,64 @@ Label prefix: `gorizond.io/spot-pca9685-`
 
 For the current SpotMicro wiring, **CH6–CH9 are empty** (leave `ch6-joint..ch9-joint` unset).
 
+## First movement (safe)
+
+1) Put the robot in a safe position (lifted / legs can move freely).
+
+2) Exec into the DaemonSet pod and use the `servo-driver` container:
+
+```bash
+kubectl -n spot-system exec -it ds/ros2-smoke -c servo-driver -- bash
+```
+
+3) Home + arm:
+
+```bash
+python3 /opt/spot/spot_cli.py home
+python3 /opt/spot/spot_cli.py arm
+```
+
+4) Move one joint with a small amplitude:
+
+```bash
+python3 /opt/spot/spot_cli.py set rf_hip=0.1
+python3 /opt/spot/spot_cli.py set rf_hip=0.0
+```
+
+5) Disarm when done:
+
+```bash
+python3 /opt/spot/spot_cli.py disarm
+```
+
+If something goes wrong:
+
+```bash
+python3 /opt/spot/spot_cli.py estop
+```
+
 ## Verify
 
 - DaemonSet is running in namespace `spot-system`
 - Logs:
   - `node-label-config` prints which channels are mapped
-- ROS topic contains JSON mapping:
+  - `servo-driver` prints PCA9685 connect + updates
+- ROS topics:
 
 ```bash
 ros2 topic echo /spot/config/servo_map --once
+ros2 topic echo /spot/state/servo --once
 ```
+
+## Command format
+
+`/spot/cmd/servo` expects `std_msgs/String` JSON:
+
+- arm/disarm: `{"cmd":"arm","value":true}` / `{"cmd":"arm","value":false}`
+- estop: `{"cmd":"estop","value":true}` / `{"cmd":"estop","value":false}`
+- home: `{"cmd":"home"}`
+- set targets:
+  - normalized: `{"cmd":"set","mode":"norm","targets":{"rf_hip":0.1}}` (range `-1..1`)
+  - microseconds: `{"cmd":"set","mode":"us","targets":{"rf_hip":1500}}`
+
+For convenience inside the pod, use `python3 /opt/spot/spot_cli.py ...`.

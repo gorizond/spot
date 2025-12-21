@@ -71,8 +71,46 @@ spec:
             - name: spot-node-label-config
               mountPath: /opt/spot
               readOnly: true
+        - name: servo-driver
+          image: ros:kilted-ros-base
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: PYTHONUNBUFFERED
+              value: "1"
+            - name: SERVO_MAP_TOPIC
+              value: "/spot/config/servo_map"
+            - name: CMD_TOPIC
+              value: "/spot/cmd/servo"
+            - name: STATUS_TOPIC
+              value: "/spot/state/servo"
+            - name: PWM_HZ
+              value: "50"
+            - name: UPDATE_HZ
+              value: "50"
+            - name: MAX_SLEW_US_PER_S
+              value: "800"
+            - name: START_ARMED
+              value: "0"
+            - name: DISARM_FULL_OFF
+              value: "1"
+          command: ["bash", "-lc"]
+          args:
+            - |
+              set -eo pipefail
+              source /opt/ros/kilted/setup.bash
+              exec python3 /opt/spot/servo_driver.py
+          volumeMounts:
+            - name: spot-node-label-config
+              mountPath: /opt/spot
+              readOnly: true
+            - name: i2c-1
+              mountPath: /dev/i2c-1
       volumes:
         - name: spot-node-label-config
           configMap:
             name: spot-node-label-config
             defaultMode: 0555
+        - name: i2c-1
+          hostPath:
+            path: /dev/i2c-1
+            type: CharDevice

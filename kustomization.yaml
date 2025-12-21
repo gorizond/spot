@@ -9,3 +9,5 @@ configMapGenerator:
   - name: spot-node-label-config
     files:
       - node_label_config.py
+      - servo_driver.py
+      - spot_cli.py
