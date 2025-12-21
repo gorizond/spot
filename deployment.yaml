@@ -2,7 +2,6 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: ros2-smoke
-  namespace: spot-system
   labels:
     app.kubernetes.io/name: ros2-smoke
     app.kubernetes.io/part-of: spot
