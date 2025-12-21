@@ -31,7 +31,7 @@ RUN set -eux; \
 
 WORKDIR ${COLCON_WS}
 
-RUN set -eux; \
+RUN set -ex; \
     source /opt/ros/${ROS_DISTRO}/setup.bash; \
     rosdep install --from-paths \
       src/champ/champ \
