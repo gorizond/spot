@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import signal
 import ssl
 import time
@@ -50,6 +51,20 @@ def _parse_int(raw: str, default: int) -> int:
         return int(str(raw).strip(), 0)
     except Exception:
         return default
+
+
+def _parse_us_triplet(raw):
+    if raw is None:
+        return None
+
+    nums = re.findall(r"\d+", str(raw))
+    if len(nums) < 3:
+        return None
+
+    try:
+        return int(nums[0]), int(nums[1]), int(nums[2])
+    except Exception:
+        return None
 
 
 def _k8s_request(url: str) -> urllib.request.Request:
@@ -117,9 +132,17 @@ def parse_servo_map(labels: dict) -> dict:
     channels = []
     for ch in range(16):
         joint = str(labels.get(f"{LABEL_PREFIX}ch{ch}-joint", "")).strip()
-        ch_min = _parse_int(labels.get(f"{LABEL_PREFIX}ch{ch}-min-us", "1000"), 1000)
-        ch_center = _parse_int(labels.get(f"{LABEL_PREFIX}ch{ch}-center-us", "1500"), 1500)
-        ch_max = _parse_int(labels.get(f"{LABEL_PREFIX}ch{ch}-max-us", "2000"), 2000)
+
+        defaults = (1000, 1500, 2000)
+        raw_triplet = labels.get(f"{LABEL_PREFIX}ch{ch}-us")
+        triplet = _parse_us_triplet(raw_triplet)
+
+        if triplet is not None:
+            ch_min, ch_center, ch_max = triplet
+        else:
+            ch_min = _parse_int(labels.get(f"{LABEL_PREFIX}ch{ch}-min-us", str(defaults[0])), defaults[0])
+            ch_center = _parse_int(labels.get(f"{LABEL_PREFIX}ch{ch}-center-us", str(defaults[1])), defaults[1])
+            ch_max = _parse_int(labels.get(f"{LABEL_PREFIX}ch{ch}-max-us", str(defaults[2])), defaults[2])
 
         raw_invert = str(labels.get(f"{LABEL_PREFIX}ch{ch}-invert", "0")).strip().lower()
         ch_invert = raw_invert in ("1", "true", "yes", "y", "on")

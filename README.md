@@ -40,10 +40,12 @@ Label prefix: `gorizond.io/spot-pca9685-`
 - `...address` (default: `0x40`)
 - Per channel `0..15`:
   - `...chN-joint` (unset/empty => unused)
-  - `...chN-min-us` (default: `1000`)
-  - `...chN-center-us` (default: `1500`)
-  - `...chN-max-us` (default: `2000`)
+  - `...chN-us` (min/center/max, default: `1000-1500-2000`)
   - `...chN-invert` (`0`/`1`, default: `0`)
+
+`...chN-us` value must be a valid Kubernetes label value (no commas). Use e.g. `1450-1500-1550`.
+
+(Backward-compatible) `...chN-min-us`, `...chN-center-us`, `...chN-max-us` are still supported if `...chN-us` is not set.
 
 For the current SpotMicro wiring, **CH6–CH9 are empty** (leave `ch6-joint..ch9-joint` unset).
 
