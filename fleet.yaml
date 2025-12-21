@@ -1,1 +1,4 @@
 defaultNamespace: spot-system
+
+kustomize:
+  dir: .

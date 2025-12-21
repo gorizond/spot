@@ -2,14 +2,16 @@
 
 Robot stack for SpotMicro/Spot running **ROS 2 Kilted** on **k3s (Raspberry Pi)**, deployed via **Rancher Fleet** (GitOps).
 
-This repo is intentionally minimal: `fleet.yaml` + `deployment.yaml`.
+This repo is intentionally minimal.
 
 ## What runs
 
-`deployment.yaml` deploys a `ros2-smoke` **DaemonSet** (one pod per robot node):
+`deployment.yaml` deploys a DaemonSet (one pod per robot node) that:
 
-- `publisher` / `subscriber` smoke test on `/chatter`
-- `node-label-config` publishes PCA9685 servo mapping from **Kubernetes Node labels** to ROS 2 topic `/spot/config/servo_map` (no ConfigMaps)
+- reads **Kubernetes Node labels** of *its own node* (RBAC-enabled)
+- converts them into a PCA9685 servo mapping
+- publishes mapping to ROS 2 topic `/spot/config/servo_map`
+- reacts to label changes via Kubernetes **watch** (no pod restart)
 
 Pods are scheduled only on nodes matching:
 
@@ -45,27 +47,12 @@ Label prefix: `gorizond.io/spot-pca9685-`
 
 For the current SpotMicro wiring, **CH6–CH9 are empty** (leave `ch6-joint..ch9-joint` unset).
 
-Example (CLI):
+## Verify
 
-```bash
-kubectl label node spot \
-  gorizond.io/spot-pca9685-i2c-bus=1 \
-  gorizond.io/spot-pca9685-address=0x40 \
-  gorizond.io/spot-pca9685-ch0-joint=lf_hip \
-  gorizond.io/spot-pca9685-ch0-min-us=1000 \
-  gorizond.io/spot-pca9685-ch0-center-us=1500 \
-  gorizond.io/spot-pca9685-ch0-max-us=2000 \
-  --overwrite
-```
-
-When labels change, `node-label-config` updates `/spot/config/servo_map` **without restarting the pod**.
-
-## Verify (on the robot cluster)
-
-- DaemonSet is running: `ros2-smoke` (namespace `spot-system`)
-- Subscriber logs show `hello-from-spot`
-- Node-label config logs show mapping publishes
-- Topic contains JSON mapping:
+- DaemonSet is running in namespace `spot-system`
+- Logs:
+  - `node-label-config` prints which channels are mapped
+- ROS topic contains JSON mapping:
 
 ```bash
 ros2 topic echo /spot/config/servo_map --once
