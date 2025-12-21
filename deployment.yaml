@@ -17,6 +17,7 @@ spec:
     spec:
       nodeSelector:
         kubernetes.io/arch: arm64
+        gorizond.io/robot: "true"
       containers:
         - name: publisher
           image: ros:kilted-ros-base
