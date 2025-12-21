@@ -425,8 +425,13 @@ class SpotServoDriver(Node):
                 self._pca = None
                 self._pca_bus = bus
                 self._pca_address = address
+
+                hint = ""
+                if isinstance(e, OSError) and getattr(e, "errno", None) in (1, 13):
+                    hint = " (hint: ensure the container is privileged and /dev/i2c-* is mounted; runAsUser=0)"
+
                 self.get_logger().error(
-                    f"failed to init PCA9685 (bus={bus} addr={hex(address)}): {e}"
+                    f"failed to init PCA9685 (bus={bus} addr={hex(address)}): {e}{hint}"
                 )
 
         self._joints = new_joints

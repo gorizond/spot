@@ -9,7 +9,7 @@ This repo is intentionally minimal.
 `deployment.yaml` deploys a DaemonSet (one pod per robot node) with:
 
 - `node-label-config`: reads **Kubernetes Node labels** of *its own node* (RBAC-enabled), converts them into a PCA9685 servo mapping, and publishes it to `/spot/config/servo_map` (reacts to label changes via watch; no pod restart).
-- `servo-driver`: subscribes to `/spot/config/servo_map`, drives **PCA9685** over I2C (`/dev/i2c-1`), accepts JSON commands on `/spot/cmd/servo`, and publishes status to `/spot/state/servo`.
+- `servo-driver`: subscribes to `/spot/config/servo_map`, drives **PCA9685** over I2C (`/dev/i2c-1`), accepts JSON commands on `/spot/cmd/servo`, and publishes status to `/spot/state/servo` (runs privileged for I2C access).
 
 Safety defaults:
 
