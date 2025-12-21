@@ -63,21 +63,27 @@ For the current SpotMicro wiring, **CH6–CH9 are empty** (leave `ch6-joint..ch9
 kubectl -n spot-system exec -it ds/ros2-smoke -c servo-driver -- bash
 ```
 
-3) Home + arm:
+3) (Optional) Reset targets to home (0.0):
 
 ```bash
-python3 /opt/spot/spot_cli.py home
-python3 /opt/spot/spot_cli.py arm
+python3 /opt/spot/spot_cli.py --repeat 1 home
 ```
 
-4) Move one joint with a small amplitude:
+4) Arm (does not move anything until you `set` a joint):
 
 ```bash
-python3 /opt/spot/spot_cli.py set rf_hip=0.1
-python3 /opt/spot/spot_cli.py set rf_hip=0.0
+python3 /opt/spot/spot_cli.py --repeat 1 arm
 ```
 
-5) Disarm when done:
+5) Enable + move one joint with small steps (calibration-friendly):
+
+```bash
+python3 /opt/spot/spot_cli.py --repeat 1 set-us rf_hip=1500
+python3 /opt/spot/spot_cli.py --repeat 1 set-us rf_hip=1510
+python3 /opt/spot/spot_cli.py --repeat 1 set-us rf_hip=1500
+```
+
+6) Disarm when done:
 
 ```bash
 python3 /opt/spot/spot_cli.py disarm
@@ -106,10 +112,10 @@ ros2 topic echo /spot/state/servo --once
 
 `/spot/cmd/servo` expects `std_msgs/String` JSON:
 
-- arm/disarm: `{"cmd":"arm","value":true}` / `{"cmd":"arm","value":false}`
+- arm/disarm: `{"cmd":"arm","value":true}` / `{"cmd":"arm","value":false}` (arming gates output; joints move only after they are enabled via `cmd=set`)
 - estop: `{"cmd":"estop","value":true}` / `{"cmd":"estop","value":false}`
 - home: `{"cmd":"home"}`
-- set targets:
+- set targets (also enables those joints):
   - normalized: `{"cmd":"set","mode":"norm","targets":{"rf_hip":0.1}}` (range `-1..1`)
   - microseconds: `{"cmd":"set","mode":"us","targets":{"rf_hip":1500}}`
 

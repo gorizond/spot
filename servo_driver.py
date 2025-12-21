@@ -301,6 +301,7 @@ class SpotServoDriver(Node):
 
         self._joints = {}
         self._targets_norm = {}
+        self._enabled_joints = set()
         self._current_us = {}
 
         self._last_tick = time.monotonic()
@@ -334,6 +335,7 @@ class SpotServoDriver(Node):
         payload = {
             "armed": self._armed,
             "estop": self._estop,
+            "enabled_joints": sorted(self._enabled_joints),
             "pca9685": {
                 "bus": self._pca_bus,
                 "address": self._pca_address,
@@ -435,6 +437,9 @@ class SpotServoDriver(Node):
                 )
 
         self._joints = new_joints
+        self._enabled_joints = {
+            joint for joint in self._enabled_joints if joint in self._joints
+        }
 
         for joint in list(self._targets_norm.keys()):
             if joint not in self._joints:
@@ -474,10 +479,20 @@ class SpotServoDriver(Node):
             if value and self._estop:
                 self.get_logger().error("arm rejected: estop=true (clear estop first)")
                 return
+
             self._armed = value
+            if not self._armed:
+                self._enabled_joints.clear()
+
             if DISARM_FULL_OFF and not self._armed:
                 self._set_all_off()
-            self.get_logger().info(f"armed={'true' if self._armed else 'false'}")
+
+            if self._armed and len(self._enabled_joints) == 0:
+                self.get_logger().info(
+                    "armed=true (no enabled joints yet; send cmd=set to enable a joint)"
+                )
+            else:
+                self.get_logger().info(f"armed={'true' if self._armed else 'false'}")
             return
 
         if ctype == "estop":
@@ -485,10 +500,12 @@ class SpotServoDriver(Node):
             self._estop = value
             if self._estop:
                 self._armed = False
+                self._enabled_joints.clear()
                 if DISARM_FULL_OFF:
                     self._set_all_off()
                 self.get_logger().warn("ESTOP engaged; outputs disabled")
             else:
+                self._enabled_joints.clear()
                 self.get_logger().info("estop cleared; still disarmed")
             return
 
@@ -523,12 +540,14 @@ class SpotServoDriver(Node):
                         cfg["invert"],
                     )
                     self._targets_norm[joint] = norm
+                    self._enabled_joints.add(joint)
                 else:
                     try:
                         norm = float(val)
                     except Exception:
                         continue
                     self._targets_norm[joint] = float(_clamp(norm, -1.0, 1.0))
+                    self._enabled_joints.add(joint)
 
             if unknown:
                 self.get_logger().warn(f"cmd.set: unknown joints: {', '.join(unknown)}")
@@ -552,8 +571,16 @@ class SpotServoDriver(Node):
         max_delta = MAX_SLEW_US_PER_S * dt
         max_delta = float(_clamp(max_delta, 1.0, 10_000.0))
 
+        if not self._enabled_joints:
+            self._publish_status()
+            return
+
         try:
-            for joint, cfg in self._joints.items():
+            for joint in sorted(self._enabled_joints):
+                cfg = self._joints.get(joint)
+                if not cfg:
+                    continue
+
                 ch = cfg["ch"]
                 target_norm = float(self._targets_norm.get(joint, 0.0))
                 target_us = _norm_to_us(
