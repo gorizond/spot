@@ -41,7 +41,8 @@ RUN set -ex; \
       src/champ/champ_config \
       src/champ/champ_description \
       src/champ/champ_msgs \
-      --ignore-src -r -y; \
+      --ignore-src -r -y \
+      --skip-keys ecl_threads; \
     colcon build --symlink-install --packages-select \
       champ champ_config champ_description champ_msgs champ_base champ_bringup; \
     rm -rf /var/lib/apt/lists/*
