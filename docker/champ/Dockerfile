@@ -32,6 +32,7 @@ RUN set -eux; \
 WORKDIR ${COLCON_WS}
 
 RUN set -ex; \
+    apt-get update; \
     source /opt/ros/${ROS_DISTRO}/setup.bash; \
     rosdep install --from-paths \
       src/champ/champ \
@@ -42,7 +43,8 @@ RUN set -ex; \
       src/champ/champ_msgs \
       --ignore-src -r -y; \
     colcon build --symlink-install --packages-select \
-      champ champ_config champ_description champ_msgs champ_base champ_bringup
+      champ champ_config champ_description champ_msgs champ_base champ_bringup; \
+    rm -rf /var/lib/apt/lists/*
 
 COPY docker/champ/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
