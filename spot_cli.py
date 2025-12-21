@@ -8,7 +8,23 @@ from rclpy.node import Node
 from std_msgs.msg import String
 
 
-def _publish(topic: str, payload: dict, repeat: int = 3, sleep_s: float = 0.05) -> None:
+def _wait_for_subscribers(node: Node, pub, wait_s: float) -> int:
+    deadline = time.monotonic() + max(0.0, float(wait_s))
+    count = int(pub.get_subscription_count())
+    while count < 1 and time.monotonic() < deadline:
+        rclpy.spin_once(node, timeout_sec=0.1)
+        time.sleep(0.05)
+        count = int(pub.get_subscription_count())
+    return count
+
+
+def _publish(
+    topic: str,
+    payload: dict,
+    repeat: int = 3,
+    sleep_s: float = 0.05,
+    wait_s: float = 1.0,
+) -> None:
     rclpy.init()
     node = Node("spot_cli")
     pub = node.create_publisher(String, topic, 10)
@@ -17,6 +33,10 @@ def _publish(topic: str, payload: dict, repeat: int = 3, sleep_s: float = 0.05) 
     msg.data = json.dumps(payload, separators=(",", ":"))
 
     try:
+        sub_count = _wait_for_subscribers(node, pub, wait_s)
+        if sub_count < 1 and wait_s > 0:
+            print(f"warning: no subscribers discovered on {topic} after {wait_s:.1f}s; sending anyway")
+
         for _ in range(max(1, int(repeat))):
             pub.publish(msg)
             rclpy.spin_once(node, timeout_sec=0.05)
@@ -37,6 +57,7 @@ def main() -> None:
     parser.add_argument("--topic", default=default_topic)
     parser.add_argument("--repeat", type=int, default=3)
     parser.add_argument("--sleep", type=float, default=0.05)
+    parser.add_argument("--wait", type=float, default=1.0)
 
     sub = parser.add_subparsers(dest="command", required=True)
 
@@ -90,7 +111,7 @@ def main() -> None:
     else:
         raise SystemExit(f"unknown command: {args.command}")
 
-    _publish(args.topic, payload, repeat=args.repeat, sleep_s=args.sleep)
+    _publish(args.topic, payload, repeat=args.repeat, sleep_s=args.sleep, wait_s=args.wait)
 
 
 if __name__ == "__main__":
