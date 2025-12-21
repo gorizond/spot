@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: spot-system
+  labels:
+    app.kubernetes.io/name: spot
+    app.kubernetes.io/part-of: gorizond
+    gorizond.io/type: robot

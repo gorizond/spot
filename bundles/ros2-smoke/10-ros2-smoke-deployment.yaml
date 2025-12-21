@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ros2-smoke
+  namespace: spot-system
+  labels:
+    app.kubernetes.io/name: ros2-smoke
+    app.kubernetes.io/part-of: spot
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ros2-smoke
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ros2-smoke
+        app.kubernetes.io/part-of: spot
+    spec:
+      nodeSelector:
+        kubernetes.io/arch: arm64
+      containers:
+        - name: publisher
+          image: ros:kilted-ros-base
+          imagePullPolicy: IfNotPresent
+          command: ["bash", "-lc"]
+          args:
+            - |
+              set -euo pipefail
+              source /opt/ros/kilted/setup.bash
+              exec ros2 topic pub /chatter std_msgs/msg/String "data: hello-from-spot" -r 1
+        - name: subscriber
+          image: ros:kilted-ros-base
+          imagePullPolicy: IfNotPresent
+          command: ["bash", "-lc"]
+          args:
+            - |
+              set -euo pipefail
+              source /opt/ros/kilted/setup.bash
+              exec ros2 topic echo /chatter std_msgs/msg/String
