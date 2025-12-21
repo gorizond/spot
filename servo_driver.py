@@ -71,6 +71,14 @@ def _parse_int(raw, default: int) -> int:
         return default
 
 
+SAFE_MIN_US = _parse_int(os.environ.get("SAFE_MIN_US", "500"), 500)
+SAFE_MAX_US = _parse_int(os.environ.get("SAFE_MAX_US", "2500"), 2500)
+SAFE_MIN_US = int(_clamp(SAFE_MIN_US, 0, 5000))
+SAFE_MAX_US = int(_clamp(SAFE_MAX_US, 0, 5000))
+if SAFE_MIN_US > SAFE_MAX_US:
+    SAFE_MIN_US, SAFE_MAX_US = SAFE_MAX_US, SAFE_MIN_US
+
+
 def _parse_bool(raw, default: bool = False) -> bool:
     if raw is None:
         return default
@@ -95,17 +103,17 @@ def _sanitize_triplet(min_us: int, center_us: int, max_us: int):
     if any(not isinstance(v, int) for v in vals):
         return 1000, 1500, 2000
 
-    min_us = _clamp(min_us, 500, 2500)
-    center_us = _clamp(center_us, 500, 2500)
-    max_us = _clamp(max_us, 500, 2500)
+    min_us = _clamp(min_us, SAFE_MIN_US, SAFE_MAX_US)
+    center_us = _clamp(center_us, SAFE_MIN_US, SAFE_MAX_US)
+    max_us = _clamp(max_us, SAFE_MIN_US, SAFE_MAX_US)
 
     if min_us > max_us:
         min_us, max_us = max_us, min_us
 
     center_us = _clamp(center_us, min_us, max_us)
     if min_us == max_us:
-        min_us = max(500, min_us - 1)
-        max_us = min(2500, max_us + 1)
+        min_us = max(SAFE_MIN_US, min_us - 1)
+        max_us = min(SAFE_MAX_US, max_us + 1)
         center_us = (min_us + max_us) // 2
 
     if center_us == min_us:

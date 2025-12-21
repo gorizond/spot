@@ -15,6 +15,7 @@ Safety defaults:
 
 - starts **disarmed** (`START_ARMED=0`)
 - clamps each joint to `min/center/max` from node labels
+- hard safety clamp via `SAFE_MIN_US`/`SAFE_MAX_US` (defaults: `500..2500`)
 - slew-rate limiting (`MAX_SLEW_US_PER_S`)
 
 Pods are scheduled only on nodes matching:
