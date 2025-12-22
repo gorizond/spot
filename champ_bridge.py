@@ -3,11 +3,11 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import re
 import time
 
 import rclpy
 from rclpy.node import Node
+from rclpy.qos import DurabilityPolicy, HistoryPolicy, QoSProfile, ReliabilityPolicy
 from sensor_msgs.msg import JointState
 from std_msgs.msg import String
 
@@ -46,34 +46,36 @@ REQUIRE_ARMED = str(os.environ.get("CHAMP_REQUIRE_ARMED", "1")).strip().lower() 
     "off",
 )
 
+_LEG_BY_WHERE_SIDE = {
+    ("front", "left"): "lf",
+    ("front", "right"): "rf",
+    ("rear", "left"): "lh",
+    ("rear", "right"): "rh",
+}
+
+_PART_TO_KIND_SUFFIX = {
+    "shoulder": ("hip", "hip"),
+    "leg": ("upper", "upper"),
+    "foot": ("lower", "lower"),
+}
+
 
 def _map_champ_joint_to_spot(name: str) -> tuple[str, str] | None:
-    name = str(name or "").strip()
-    m = re.match(r"^(front|rear)_(left|right)_(shoulder|leg|foot)$", name)
-    if not m:
+    parts = str(name or "").strip().split("_")
+    if len(parts) != 3:
         return None
 
-    where, side, part = m.groups()
-    if where == "front" and side == "left":
-        leg = "lf"
-    elif where == "front" and side == "right":
-        leg = "rf"
-    elif where == "rear" and side == "left":
-        leg = "lh"
-    else:
-        leg = "rh"
+    where, side, part = parts
+    leg = _LEG_BY_WHERE_SIDE.get((where, side))
+    if not leg:
+        return None
 
-    if part == "shoulder":
-        kind = "hip"
-        out = f"{leg}_hip"
-    elif part == "leg":
-        kind = "upper"
-        out = f"{leg}_upper"
-    else:
-        kind = "lower"
-        out = f"{leg}_lower"
+    kind_suffix = _PART_TO_KIND_SUFFIX.get(part)
+    if not kind_suffix:
+        return None
 
-    return out, kind
+    kind, suffix = kind_suffix
+    return f"{leg}_{suffix}", kind
 
 
 class ChampBridge(Node):
@@ -99,11 +101,15 @@ class ChampBridge(Node):
         self._estop = False
         self._require_armed = bool(require_armed)
 
+        self._latest_joint_state: JointState | None = None
+        self._latest_joint_state_seq = 0
+        self._processed_joint_state_seq = 0
+        self._force_publish = False
+
         self._zero_by_joint: dict[str, float] = {}
 
         self._gain = float(_clamp(gain, 0.0, 2.0))
         self._publish_period_s = 1.0 / max(1.0, float(publish_hz))
-        self._last_pub = 0.0
         self._last_log = 0.0
 
         self._ranges = {
@@ -117,11 +123,22 @@ class ChampBridge(Node):
             "lower": float(_clamp(STAND_LOWER, -1.0, 1.0)),
         }
 
+        qos_joint_states = QoSProfile(
+            history=HistoryPolicy.KEEP_LAST,
+            depth=1,
+            reliability=ReliabilityPolicy.BEST_EFFORT,
+            durability=DurabilityPolicy.VOLATILE,
+        )
+
         self.create_subscription(String, status_topic, self._on_status, 10)
-        self.create_subscription(JointState, joint_states_topic, self._on_joint_states, 10)
+        self.create_subscription(
+            JointState, joint_states_topic, self._on_joint_states, qos_joint_states
+        )
+        self.create_timer(self._publish_period_s, self._tick)
 
         self.get_logger().info(
-            "starting; joint_states=%s status=%s cmd=%s publish_hz=%.1f gain=%.2f stand=(%.3f/%.3f/%.3f)" % (
+            "starting; joint_states=%s status=%s cmd=%s publish_hz=%.1f gain=%.2f stand=(%.3f/%.3f/%.3f)"
+            % (
                 joint_states_topic,
                 status_topic,
                 cmd_topic,
@@ -146,47 +163,75 @@ class ChampBridge(Node):
         if not isinstance(obj, dict):
             return
 
-        self._armed = bool(obj.get("armed", False))
-        self._estop = bool(obj.get("estop", False))
+        armed = bool(obj.get("armed", False))
+        estop = bool(obj.get("estop", False))
+
+        if armed != self._armed or estop != self._estop:
+            self._force_publish = True
+
+        self._armed = armed
+        self._estop = estop
 
     def _on_joint_states(self, msg: JointState) -> None:
-        now = time.monotonic()
-        if now - self._last_pub < self._publish_period_s:
-            return
+        self._latest_joint_state = msg
+        self._latest_joint_state_seq += 1
 
+    def _tick(self) -> None:
         if self._estop:
             return
 
         if self._require_armed and not self._armed:
             return
 
-        if not msg.name or not msg.position or len(msg.name) != len(msg.position):
+        msg = self._latest_joint_state
+        if msg is None:
+            return
+
+        if (
+            self._latest_joint_state_seq == self._processed_joint_state_seq
+            and not self._force_publish
+        ):
+            return
+
+        names = msg.name
+        positions = msg.position
+        if not names or not positions or len(names) != len(positions):
             return
 
         if not self._zero_by_joint:
             self._zero_by_joint = {
                 str(name): float(pos)
-                for name, pos in zip(msg.name, msg.position)
+                for name, pos in zip(names, positions)
                 if name
             }
             self.get_logger().info(
                 "captured CHAMP zero angles (stand reference) from first joint_states message"
             )
 
+        zero_by_joint = self._zero_by_joint
+        ranges = self._ranges
+        stand = self._stand
+        gain = self._gain
+
         targets: dict[str, float] = {}
-        for name, pos in zip(msg.name, msg.position):
+        for name, pos in zip(names, positions):
             mapped = _map_champ_joint_to_spot(name)
             if not mapped:
                 continue
 
             out_name, kind = mapped
-            zero = float(self._zero_by_joint.get(name, 0.0))
+            zero = float(zero_by_joint.get(name, 0.0))
             delta = float(pos) - zero
 
-            scaled = float(_clamp(delta / self._ranges[kind], -1.0, 1.0))
-            out = self._stand[kind] + scaled * self._gain
+            scaled = delta / ranges[kind]
+            scaled = float(_clamp(scaled, -1.0, 1.0))
+
+            out = stand[kind] + scaled * gain
             out = float(_clamp(out, -1.0, 1.0))
             targets[out_name] = out
+
+        self._processed_joint_state_seq = self._latest_joint_state_seq
+        self._force_publish = False
 
         if not targets:
             return
@@ -196,11 +241,12 @@ class ChampBridge(Node):
         out_msg.data = json.dumps(payload, separators=(",", ":"))
         self._cmd_pub.publish(out_msg)
 
-        self._last_pub = now
+        now = time.monotonic()
         if now - self._last_log > 5.0:
             self._last_log = now
             self.get_logger().info(
-                "published %d joint targets to %s (armed=%s)" % (
+                "published %d joint targets to %s (armed=%s)"
+                % (
                     len(targets),
                     self._cmd_topic,
                     "true" if self._armed else "false",
