@@ -85,6 +85,18 @@ spec:
               if [ -f /ws/install/setup.bash ]; then
                 source /ws/install/setup.bash
               fi
+
+              CHAMP_BASE_PREFIX="$(ros2 pkg prefix champ_base 2>/dev/null || true)"
+              EKF_DIR="${CHAMP_BASE_PREFIX}/share/champ_base/config/ekf"
+              if [ -d "${EKF_DIR}" ]; then
+                if [ -f /opt/spot/champ/ekf/base_to_footprint.yaml ]; then
+                  cp /opt/spot/champ/ekf/base_to_footprint.yaml "${EKF_DIR}/base_to_footprint.yaml" || true
+                fi
+                if [ -f /opt/spot/champ/ekf/footprint_to_odom.yaml ]; then
+                  cp /opt/spot/champ/ekf/footprint_to_odom.yaml "${EKF_DIR}/footprint_to_odom.yaml" || true
+                fi
+              fi
+
               exec ros2 launch champ_bringup bringup.launch.py \
                 rviz:=false use_sim_time:=false gazebo:=false \
                 description_path:=/opt/spot/champ/spotmicroai.urdf.xacro \
@@ -187,6 +199,10 @@ spec:
                 path: champ/links_ros2.yaml
               - key: gait_ros2.yaml
                 path: champ/gait_ros2.yaml
+              - key: base_to_footprint.yaml
+                path: champ/ekf/base_to_footprint.yaml
+              - key: footprint_to_odom.yaml
+                path: champ/ekf/footprint_to_odom.yaml
         - name: i2c-1
           hostPath:
             path: /dev/i2c-1

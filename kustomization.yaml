@@ -16,3 +16,5 @@ configMapGenerator:
       - joints_ros2.yaml
       - links_ros2.yaml
       - gait_ros2.yaml
+      - base_to_footprint.yaml
+      - footprint_to_odom.yaml
