@@ -12,7 +12,7 @@ configMapGenerator:
       - servo_driver.py
       - spot_cli.py
       - champ_bridge.py
-      - spotmicroai.urdf.xacro=champ/spotmicroai.urdf.xacro
-      - joints_ros2.yaml=champ/joints_ros2.yaml
-      - links_ros2.yaml=champ/links_ros2.yaml
-      - gait_ros2.yaml=champ/gait_ros2.yaml
+      - spotmicroai.urdf.xacro
+      - joints_ros2.yaml
+      - links_ros2.yaml
+      - gait_ros2.yaml
