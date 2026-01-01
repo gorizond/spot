@@ -1,0 +1,243 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: spot-i2c-bootstrap
+  labels:
+    app.kubernetes.io/name: spot-i2c-bootstrap
+    app.kubernetes.io/part-of: spot
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: spot-i2c-bootstrap
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: spot-i2c-bootstrap
+        app.kubernetes.io/part-of: spot
+    spec:
+      hostPID: true
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/arch
+                    operator: In
+                    values: ["arm64"]
+                  - key: gorizond.io/robot
+                    operator: In
+                    values: ["true"]
+                  - key: gorizond.io/spot-pca9685-i2c-bus
+                    operator: Exists
+      containers:
+        - name: bootstrap
+          image: ubuntu:24.04
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            privileged: true
+            runAsUser: 0
+            runAsGroup: 0
+            allowPrivilegeEscalation: true
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: SPOT_I2C_BOOTSTRAP_REBOOT
+              value: "1"
+          command: ["bash", "-lc"]
+          args:
+            - |
+              set -euo pipefail
+
+              log() {
+                echo "[$(date -Iseconds)] ${NODE_NAME:-unknown}: $*"
+              }
+
+              BOOT_CONFIG=""
+              for candidate in /host-boot/firmware/config.txt /host-boot/config.txt; do
+                if [ -f "${candidate}" ]; then
+                  BOOT_CONFIG="${candidate}"
+                  break
+                fi
+              done
+
+              if [ -z "${BOOT_CONFIG}" ]; then
+                log "ERROR: cannot find boot config (tried /boot/firmware/config.txt and /boot/config.txt)"
+                sleep infinity
+              fi
+
+              MARK_DIR="/host-var-lib"
+              mkdir -p "${MARK_DIR}"
+
+              REBOOT_MARK="${MARK_DIR}/reboot-requested"
+              REBOOT_REQUIRED_MARK="${MARK_DIR}/reboot-required"
+              DONE_MARK="${MARK_DIR}/i2c-ready"
+              BACKUP_MARK="${MARK_DIR}/$(basename "${BOOT_CONFIG}").bak"
+
+              if [ -c /host-dev/i2c-1 ]; then
+                log "/dev/i2c-1 already present; nothing to do"
+                rm -f "${REBOOT_MARK}" "${REBOOT_REQUIRED_MARK}" || true
+                date -Iseconds >"${DONE_MARK}" || true
+                sleep infinity
+              fi
+
+              if [ ! -f "${BACKUP_MARK}" ]; then
+                cp -a "${BOOT_CONFIG}" "${BACKUP_MARK}" || true
+              fi
+
+              MODULES_FILE="/host-etc/modules-load.d/spot-i2c-dev.conf"
+              if [ ! -f "${MODULES_FILE}" ] || ! grep -Fxq "i2c-dev" "${MODULES_FILE}"; then
+                log "Ensuring i2c-dev loads on boot: ${MODULES_FILE}"
+                if ! cat >"${MODULES_FILE}" <<'EOF'
+              # Managed by spot-i2c-bootstrap (Fleet)
+              i2c-dev
+              EOF
+                then
+                  log "ERROR: failed to write ${MODULES_FILE}"
+                  sleep infinity
+                fi
+              fi
+
+              if grep -Eq '^[[:space:]]*dtparam=i2c_arm=on([,[:space:]]|$)' "${BOOT_CONFIG}"; then
+                log "dtparam=i2c_arm=on already enabled in ${BOOT_CONFIG}"
+              elif grep -Eq '^[[:space:]]*#[[:space:]]*dtparam=i2c_arm=on([,[:space:]]|$)' "${BOOT_CONFIG}"; then
+                log "Uncommenting dtparam=i2c_arm=on in ${BOOT_CONFIG}"
+                if ! sed -i 's/^[[:space:]]*#[[:space:]]*dtparam=i2c_arm=on/dtparam=i2c_arm=on/' "${BOOT_CONFIG}"; then
+                  log "ERROR: failed to update ${BOOT_CONFIG}"
+                  sleep infinity
+                fi
+                date -Iseconds >"${REBOOT_REQUIRED_MARK}" || true
+              else
+                log "Appending dtparam=i2c_arm=on to ${BOOT_CONFIG}"
+                if ! {
+                  echo
+                  echo "# Enabled by spot-i2c-bootstrap (Fleet)"
+                  echo "dtparam=i2c_arm=on"
+                } >>"${BOOT_CONFIG}"; then
+                  log "ERROR: failed to append to ${BOOT_CONFIG}"
+                  sleep infinity
+                fi
+                date -Iseconds >"${REBOOT_REQUIRED_MARK}" || true
+              fi
+
+              log "Trying to load i2c-dev on host (no reboot)..."
+              if [ -x /host-root/sbin/modprobe ]; then
+                chroot /host-root /sbin/modprobe i2c-dev || true
+              elif [ -x /host-root/usr/sbin/modprobe ]; then
+                chroot /host-root /usr/sbin/modprobe i2c-dev || true
+              fi
+              sleep 2
+
+              if [ -c /host-dev/i2c-1 ]; then
+                log "/dev/i2c-1 is now present; done"
+                rm -f "${REBOOT_MARK}" "${REBOOT_REQUIRED_MARK}" || true
+                date -Iseconds >"${DONE_MARK}" || true
+                sleep infinity
+              fi
+
+              if [ -f "${REBOOT_MARK}" ]; then
+                log "Reboot already requested (marker exists), but /dev/i2c-1 is still missing; not rebooting again"
+                log "Trying to load i2c-dev on host (no reboot)..."
+                if [ -x /host-root/sbin/modprobe ]; then
+                  chroot /host-root /sbin/modprobe i2c-dev || true
+                elif [ -x /host-root/usr/sbin/modprobe ]; then
+                  chroot /host-root /usr/sbin/modprobe i2c-dev || true
+                fi
+                sleep 2
+
+                if [ -c /host-dev/i2c-1 ]; then
+                  log "/dev/i2c-1 appeared; done"
+                  rm -f "${REBOOT_MARK}" "${REBOOT_REQUIRED_MARK}" || true
+                  date -Iseconds >"${DONE_MARK}" || true
+                  sleep infinity
+                fi
+
+                log "Hint: check ${BOOT_CONFIG} and whether i2c-dev module loads; manual fix may be required"
+                ls -la /host-dev/i2c* 2>/dev/null || true
+                sleep infinity
+              fi
+
+              if [ "${SPOT_I2C_BOOTSTRAP_REBOOT:-0}" != "1" ]; then
+                log "/dev/i2c-1 is missing; reboot is required but disabled (SPOT_I2C_BOOTSTRAP_REBOOT!=1)"
+                date -Iseconds >"${REBOOT_REQUIRED_MARK}" || true
+                sleep infinity
+              fi
+
+              if [ ! -f "${REBOOT_REQUIRED_MARK}" ]; then
+                date -Iseconds >"${REBOOT_REQUIRED_MARK}" || true
+              fi
+
+              log "Requesting one-time reboot to apply I2C config"
+              date -Iseconds >"${REBOOT_MARK}"
+              sync || true
+              sleep 5
+
+              reboot_initiated=0
+
+              log "Rebooting via host systemd..."
+              if [ -x /host-root/bin/systemctl ]; then
+                if chroot /host-root /bin/systemctl reboot --no-wall; then
+                  reboot_initiated=1
+                fi
+              elif [ -x /host-root/usr/bin/systemctl ]; then
+                if chroot /host-root /usr/bin/systemctl reboot --no-wall; then
+                  reboot_initiated=1
+                fi
+              fi
+
+              log "Rebooting via host reboot(8)..."
+              if [ "${reboot_initiated}" -eq 0 ] && [ -x /host-root/sbin/reboot ]; then
+                if chroot /host-root /sbin/reboot -f; then
+                  reboot_initiated=1
+                fi
+              fi
+
+              if [ "${reboot_initiated}" -eq 1 ]; then
+                log "Reboot command executed; waiting for node to go down..."
+                sleep 60
+              fi
+
+              log "Forcing reboot via sysrq (fallback)..."
+              echo 1 >/proc/sys/kernel/sysrq || true
+              echo s >/proc/sysrq-trigger || true
+              sleep 2
+              echo u >/proc/sysrq-trigger || true
+              sleep 2
+              echo b >/proc/sysrq-trigger || true
+
+              sleep infinity
+          volumeMounts:
+            - name: host-boot
+              mountPath: /host-boot
+            - name: host-dev
+              mountPath: /host-dev
+              readOnly: true
+            - name: host-modules-load
+              mountPath: /host-etc/modules-load.d
+            - name: host-var-lib
+              mountPath: /host-var-lib
+            - name: host-root
+              mountPath: /host-root
+              readOnly: true
+      volumes:
+        - name: host-boot
+          hostPath:
+            path: /boot
+            type: Directory
+        - name: host-dev
+          hostPath:
+            path: /dev
+            type: Directory
+        - name: host-modules-load
+          hostPath:
+            path: /etc/modules-load.d
+            type: DirectoryOrCreate
+        - name: host-var-lib
+          hostPath:
+            path: /var/lib/spot-i2c-setup
+            type: DirectoryOrCreate
+        - name: host-root
+          hostPath:
+            path: /
+            type: Directory
