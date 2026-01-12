@@ -154,6 +154,14 @@ python3 /opt/spot/spot_cli.py --repeat 1 walk --steps 1 --hip-swing 0.03
 
 This uses CHAMP (model-based gait controller) and bridges its `joint_states` to the low-level `servo-driver`.
 
+### Enable/disable
+
+`spot-champ` is gated by a node label so it doesn't override manual `spot_cli` commands.
+
+To enable CHAMP on a robot node:
+
+- Add label `gorizond.io/spot-champ=true` to the node (e.g. `spot-1`).
+
 ### Image
 
 By default, `spot-champ` uses `ghcr.io/gorizond/spot-champ:main` (built and pushed by GitHub Actions in this repo).

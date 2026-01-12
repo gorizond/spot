@@ -152,6 +152,7 @@ spec:
       nodeSelector:
         kubernetes.io/arch: arm64
         gorizond.io/robot: "true"
+        gorizond.io/spot-champ: "true"
       containers:
         - name: champ-controller
           image: ghcr.io/gorizond/spot-champ:main
