@@ -71,6 +71,88 @@ spec:
             - name: spot-node-label-config
               mountPath: /opt/spot
               readOnly: true
+        - name: servo-driver
+          image: ros:kilted-ros-base
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            privileged: true
+            runAsUser: 0
+            runAsGroup: 0
+            allowPrivilegeEscalation: true
+          env:
+            - name: PYTHONUNBUFFERED
+              value: "1"
+            - name: SERVO_MAP_TOPIC
+              value: "/spot/config/servo_map"
+            - name: CMD_TOPIC
+              value: "/spot/cmd/servo"
+            - name: STATUS_TOPIC
+              value: "/spot/state/servo"
+            - name: PWM_HZ
+              value: "50"
+            - name: UPDATE_HZ
+              value: "20"
+            - name: MAX_SLEW_US_PER_S
+              value: "200"
+            - name: SAFE_MIN_US
+              value: "100"
+            - name: SAFE_MAX_US
+              value: "3000"
+            - name: START_ARMED
+              value: "0"
+            - name: DISARM_FULL_OFF
+              value: "1"
+          command: ["bash", "-lc"]
+          args:
+            - |
+              set -eo pipefail
+              source /opt/ros/kilted/setup.bash
+              exec python3 /opt/spot/servo_driver.py
+          volumeMounts:
+            - name: spot-node-label-config
+              mountPath: /opt/spot
+              readOnly: true
+            - name: i2c-1
+              mountPath: /dev/i2c-1
+      volumes:
+        - name: spot-node-label-config
+          configMap:
+            name: spot-node-label-config
+            defaultMode: 0555
+            items:
+              - key: node_label_config.py
+                path: node_label_config.py
+              - key: servo_driver.py
+                path: servo_driver.py
+              - key: spot_cli.py
+                path: spot_cli.py
+        - name: i2c-1
+          hostPath:
+            path: /dev/i2c-1
+            type: CharDevice
+
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: spot-champ
+  labels:
+    app.kubernetes.io/name: spot-champ
+    app.kubernetes.io/part-of: spot
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: spot-champ
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: spot-champ
+        app.kubernetes.io/part-of: spot
+    spec:
+      nodeSelector:
+        kubernetes.io/arch: arm64
+        gorizond.io/robot: "true"
+      containers:
         - name: champ-controller
           image: ghcr.io/gorizond/spot-champ:main
           imagePullPolicy: Always
@@ -134,61 +216,12 @@ spec:
             - name: spot-node-label-config
               mountPath: /opt/spot
               readOnly: true
-        - name: servo-driver
-          image: ros:kilted-ros-base
-          imagePullPolicy: IfNotPresent
-          securityContext:
-            privileged: true
-            runAsUser: 0
-            runAsGroup: 0
-            allowPrivilegeEscalation: true
-          env:
-            - name: PYTHONUNBUFFERED
-              value: "1"
-            - name: SERVO_MAP_TOPIC
-              value: "/spot/config/servo_map"
-            - name: CMD_TOPIC
-              value: "/spot/cmd/servo"
-            - name: STATUS_TOPIC
-              value: "/spot/state/servo"
-            - name: PWM_HZ
-              value: "50"
-            - name: UPDATE_HZ
-              value: "20"
-            - name: MAX_SLEW_US_PER_S
-              value: "200"
-            - name: SAFE_MIN_US
-              value: "100"
-            - name: SAFE_MAX_US
-              value: "3000"
-            - name: START_ARMED
-              value: "0"
-            - name: DISARM_FULL_OFF
-              value: "1"
-          command: ["bash", "-lc"]
-          args:
-            - |
-              set -eo pipefail
-              source /opt/ros/kilted/setup.bash
-              exec python3 /opt/spot/servo_driver.py
-          volumeMounts:
-            - name: spot-node-label-config
-              mountPath: /opt/spot
-              readOnly: true
-            - name: i2c-1
-              mountPath: /dev/i2c-1
       volumes:
         - name: spot-node-label-config
           configMap:
             name: spot-node-label-config
             defaultMode: 0555
             items:
-              - key: node_label_config.py
-                path: node_label_config.py
-              - key: servo_driver.py
-                path: servo_driver.py
-              - key: spot_cli.py
-                path: spot_cli.py
               - key: champ_bridge.py
                 path: champ_bridge.py
               - key: spotmicroai.urdf.xacro
@@ -203,7 +236,3 @@ spec:
                 path: champ/ekf/base_to_footprint.yaml
               - key: footprint_to_odom.yaml
                 path: champ/ekf/footprint_to_odom.yaml
-        - name: i2c-1
-          hostPath:
-            path: /dev/i2c-1
-            type: CharDevice

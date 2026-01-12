@@ -6,10 +6,14 @@ This repo is intentionally minimal.
 
 ## What runs
 
-`deployment.yaml` deploys a DaemonSet (one pod per robot node) with:
+`deployment.yaml` deploys two DaemonSets (one pod per robot node):
 
-- `node-label-config`: reads **Kubernetes Node labels** of *its own node* (RBAC-enabled), converts them into a PCA9685 servo mapping, and publishes it to `/spot/config/servo_map` (reacts to label changes via watch; no pod restart).
-- `servo-driver`: subscribes to `/spot/config/servo_map`, drives **PCA9685** over I2C (`/dev/i2c-1`), accepts JSON commands on `/spot/cmd/servo`, and publishes status to `/spot/state/servo` (runs privileged for I2C access).
+- `ros2-smoke` (core):
+  - `node-label-config`: reads **Kubernetes Node labels** of *its own node* (RBAC-enabled), converts them into a PCA9685 servo mapping, and publishes it to `/spot/config/servo_map` (reacts to label changes via watch; no pod restart).
+  - `servo-driver`: subscribes to `/spot/config/servo_map`, drives **PCA9685** over I2C (`/dev/i2c-1`), accepts JSON commands on `/spot/cmd/servo`, and publishes status to `/spot/state/servo` (runs privileged for I2C access).
+- `spot-champ` (optional):
+  - `champ-controller`: runs CHAMP gait controller (`joint_states`, `/cmd_vel`, etc).
+  - `champ-bridge`: bridges CHAMP `joint_states` to `servo-driver` commands on `/spot/cmd/servo`.
 
 Safety defaults:
 
@@ -152,7 +156,7 @@ This uses CHAMP (model-based gait controller) and bridges its `joint_states` to 
 
 ### Image
 
-By default, the DaemonSet uses `ghcr.io/gorizond/spot-champ:main` (built and pushed by GitHub Actions in this repo).
+By default, `spot-champ` uses `ghcr.io/gorizond/spot-champ:main` (built and pushed by GitHub Actions in this repo).
 
 - Tags: `main` (default branch) and `sha-<short>` (per-commit, immutable).
 - If your package is private, configure an `imagePullSecret` for GHCR.
@@ -166,7 +170,7 @@ docker build -t spot-champ:local -f docker/champ/Dockerfile .
 Then, drive the gait by publishing `/cmd_vel` (start small):
 
 ```bash
-kubectl -n spot-system exec -it ds/ros2-smoke -c champ-controller -- bash
+kubectl -n spot-system exec -it ds/spot-champ -c champ-controller -- bash
 source /opt/ros/kilted/setup.bash
 [ -f /ws/install/setup.bash ] && source /ws/install/setup.bash
 ros2 topic pub /cmd_vel geometry_msgs/msg/Twist '{linear: {x: 0.05}}' -r 2
@@ -179,7 +183,7 @@ Notes:
 
 ## Verify
 
-- DaemonSet is running in namespace `spot-system`
+- DaemonSets are running in namespace `spot-system` (`ros2-smoke`, `spot-champ`)
 - Logs:
   - `node-label-config` prints which channels are mapped
   - `servo-driver` prints PCA9685 connect + updates
