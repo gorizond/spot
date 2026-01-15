@@ -5,6 +5,7 @@ namespace: spot-system
 resources:
   - deployment.yaml
   - i2c-bootstrap.yaml
+  - performance-setup.yaml
 
 configMapGenerator:
   - name: spot-node-label-config

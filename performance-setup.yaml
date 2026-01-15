@@ -1,0 +1,150 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: rpi-performance-setup
+  labels:
+    app.kubernetes.io/name: rpi-performance-setup
+    app.kubernetes.io/part-of: spot
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: rpi-performance-setup
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: rpi-performance-setup
+        app.kubernetes.io/part-of: spot
+    spec:
+      hostPID: true
+      hostNetwork: true
+      restartPolicy: Always
+      nodeSelector:
+        kubernetes.io/arch: arm64
+        gorizond.io/robot: "true"
+      tolerations:
+      - operator: "Exists"
+        effect: "NoSchedule"
+      - operator: "Exists"
+        effect: "NoExecute"
+      containers:
+      - name: performance-setup
+        image: ubuntu:24.04
+        securityContext:
+          privileged: true
+          runAsUser: 0
+          runAsGroup: 0
+          allowPrivilegeEscalation: true
+        command: ["/bin/bash", "-c"]
+        args:
+          - |
+            #!/bin/bash
+            echo "Setting up RPi performance mode..."
+            
+            # Wait for the host filesystem to be available
+            while [ ! -f /host/etc/os-release ]; do
+              echo "Waiting for host filesystem..."
+              sleep 5
+            done
+            
+            # Check if we're on a Raspberry Pi
+            if grep -q "Raspberry Pi" /host/etc/os-release 2>/dev/null || grep -qi "raspberry" /host/proc/device-tree/model 2>/dev/null; then
+              echo "Raspberry Pi detected, applying performance settings..."
+              
+              # Set CPU governor to performance
+              GOVERNOR_PATH="/host/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"
+              if [ -w "$GOVERNOR_PATH" ]; then
+                echo "performance" > "$GOVERNOR_PATH" || echo "Failed to set CPU governor"
+              fi
+              
+              # Apply settings periodically
+              while true; do
+                # Set CPU governor to performance (in case it changed)
+                if [ -w "$GOVERNOR_PATH" ]; then
+                  echo "performance" > "$GOVERNOR_PATH" 2>/dev/null || true
+                fi
+                
+                # Check if we can access vcgencmd on the host
+                if [ -f /host/usr/bin/vcgencmd ] || [ -f /host/opt/vc/bin/vcgencmd ]; then
+                  # Attempt to set performance mode using vcgencmd if available
+                  chroot /host /bin/bash -c "vcgencmd set_config int 'arm_freq_min=1500'" 2>/dev/null || true
+                  chroot /host /bin/bash -c "vcgencmd set_config int 'core_freq_min=500'" 2>/dev/null || true
+                  chroot /host /bin/bash -c "vcgencmd set_config int 'sdram_freq_min=500'" 2>/dev/null || true
+                  chroot /host /bin/bash -c "vcgencmd set_config int 'over_voltage_min=0'" 2>/dev/null || true
+                fi
+                
+                # Monitor throttling status
+                if [ -f /host/usr/bin/vcgencmd ]; then
+                  THROTTLE_STATUS=$(chroot /host /bin/bash -c "vcgencmd get_throttled" 2>/dev/null || echo "unknown")
+                  if [[ "$THROTTLE_STATUS" =~ throttled=0x[1-9a-fA-F] ]]; then
+                    echo "WARNING: Throttling detected: $THROTTLE_STATUS"
+                  fi
+                fi
+                
+                sleep 30
+              done
+            else
+              echo "Not running on Raspberry Pi, skipping performance setup"
+              # Just sleep indefinitely if not on RPi
+              tail -f /dev/null
+            fi
+        volumeMounts:
+        - name: host-etc
+          mountPath: /host/etc
+          readOnly: true
+        - name: host-sys
+          mountPath: /host/sys
+        - name: host-proc
+          mountPath: /host/proc
+          readOnly: true
+        - name: host-usr
+          mountPath: /host/usr
+          readOnly: true
+        - name: host-opt
+          mountPath: /host/opt
+          readOnly: true
+        - name: host-dev
+          mountPath: /host/dev
+        - name: host-boot
+          mountPath: /host/boot
+        - name: host-root
+          mountPath: /
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            cpu: 100m
+            memory: 64Mi
+      volumes:
+      - name: host-etc
+        hostPath:
+          path: /etc
+          type: Directory
+      - name: host-sys
+        hostPath:
+          path: /sys
+          type: Directory
+      - name: host-proc
+        hostPath:
+          path: /proc
+          type: Directory
+      - name: host-usr
+        hostPath:
+          path: /usr
+          type: Directory
+      - name: host-opt
+        hostPath:
+          path: /opt
+          type: Directory
+      - name: host-dev
+        hostPath:
+          path: /dev
+          type: Directory
+      - name: host-boot
+        hostPath:
+          path: /boot
+          type: Directory
+      - name: host-root
+        hostPath:
+          path: /
+          type: Directory
