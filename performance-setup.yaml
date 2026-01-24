@@ -107,7 +107,7 @@ spec:
         - name: host-boot
           mountPath: /host/boot
         - name: host-root
-          mountPath: /
+          mountPath: /host
         resources:
           requests:
             cpu: 10m
