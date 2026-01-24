@@ -50,10 +50,114 @@ spec:
             if grep -q "Raspberry Pi" /host/etc/os-release 2>/dev/null || grep -qi "raspberry" /host/proc/device-tree/model 2>/dev/null; then
               echo "Raspberry Pi detected, applying performance settings..."
               
+              log() {
+                echo "[$(date -Iseconds)] $*"
+              }
+
+              BOOT_CONFIG=""
+              for candidate in /host/boot/firmware/config.txt /host/boot/config.txt; do
+                if [ -f "${candidate}" ]; then
+                  BOOT_CONFIG="${candidate}"
+                  break
+                fi
+              done
+
+              if [ -z "${BOOT_CONFIG}" ]; then
+                log "ERROR: cannot find boot config (tried /boot/firmware/config.txt and /boot/config.txt)"
+                sleep infinity
+              fi
+
+              MARK_DIR="/host/var/lib/spot-performance-setup"
+              mkdir -p "${MARK_DIR}"
+              REBOOT_MARK="${MARK_DIR}/reboot-requested"
+              REBOOT_REQUIRED_MARK="${MARK_DIR}/reboot-required"
+
+              changed=0
+              ensure_header() {
+                if ! grep -q "Added by spot performance setup" "${BOOT_CONFIG}"; then
+                  {
+                    echo ""
+                    echo "# Added by spot performance setup"
+                  } >>"${BOOT_CONFIG}"
+                fi
+              }
+              ensure_param() {
+                local key="$1"
+                local val="$2"
+                if grep -Eq "^[[:space:]]*${key}=${val}([[:space:]]|$)" "${BOOT_CONFIG}"; then
+                  return 0
+                fi
+                if grep -Eq "^[[:space:]]*#*[[:space:]]*${key}=" "${BOOT_CONFIG}"; then
+                  if sed -i "s|^[[:space:]]*#*[[:space:]]*${key}=.*|${key}=${val}|" "${BOOT_CONFIG}"; then
+                    changed=1
+                  fi
+                else
+                  ensure_header
+                  if echo "${key}=${val}" >>"${BOOT_CONFIG}"; then
+                    changed=1
+                  fi
+                fi
+              }
+
+              # Ensure boot-time performance settings (applied after reboot)
+              ensure_param "arm_freq_min" "1500"
+              ensure_param "core_freq_min" "500"
+              ensure_param "sdram_freq_min" "500"
+              ensure_param "over_voltage_min" "0"
+
               # Set CPU governor to performance
               GOVERNOR_PATH="/host/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"
               if [ -w "$GOVERNOR_PATH" ]; then
                 echo "performance" > "$GOVERNOR_PATH" || echo "Failed to set CPU governor"
+              fi
+
+              if [ "${changed}" -eq 1 ]; then
+                log "Boot config updated (${BOOT_CONFIG}); reboot is required"
+                date -Iseconds >"${REBOOT_REQUIRED_MARK}" || true
+                if [ -f "${REBOOT_MARK}" ]; then
+                  log "Reboot already requested; waiting for node to restart"
+                  sleep infinity
+                fi
+                if [ "${SPOT_PERF_SETUP_REBOOT:-1}" != "1" ]; then
+                  log "Reboot is required but disabled (SPOT_PERF_SETUP_REBOOT!=1)"
+                  sleep infinity
+                fi
+                date -Iseconds >"${REBOOT_MARK}" || true
+                sync || true
+                sleep 5
+
+                reboot_initiated=0
+                log "Rebooting via host systemd..."
+                if [ -x /host/bin/systemctl ]; then
+                  if chroot /host /bin/systemctl reboot --no-wall; then
+                    reboot_initiated=1
+                  fi
+                elif [ -x /host/usr/bin/systemctl ]; then
+                  if chroot /host /usr/bin/systemctl reboot --no-wall; then
+                    reboot_initiated=1
+                  fi
+                fi
+
+                log "Rebooting via host reboot(8)..."
+                if [ "${reboot_initiated}" -eq 0 ] && [ -x /host/sbin/reboot ]; then
+                  if chroot /host /sbin/reboot -f; then
+                    reboot_initiated=1
+                  fi
+                fi
+
+                if [ "${reboot_initiated}" -eq 1 ]; then
+                  log "Reboot command executed; waiting for node to go down..."
+                  sleep 60
+                fi
+
+                log "Forcing reboot via sysrq (fallback)..."
+                echo 1 >/proc/sys/kernel/sysrq || true
+                echo s >/proc/sysrq-trigger || true
+                sleep 2
+                echo u >/proc/sysrq-trigger || true
+                sleep 2
+                echo b >/proc/sysrq-trigger || true
+                sleep infinity
               fi
               
               # Apply settings periodically
@@ -61,15 +165,6 @@ spec:
                 # Set CPU governor to performance (in case it changed)
                 if [ -w "$GOVERNOR_PATH" ]; then
                   echo "performance" > "$GOVERNOR_PATH" 2>/dev/null || true
-                fi
-                
-                # Check if we can access vcgencmd on the host
-                if [ -f /host/usr/bin/vcgencmd ] || [ -f /host/opt/vc/bin/vcgencmd ]; then
-                  # Attempt to set performance mode using vcgencmd if available
-                  chroot /host /bin/bash -c "vcgencmd set_config int 'arm_freq_min=1500'" 2>/dev/null || true
-                  chroot /host /bin/bash -c "vcgencmd set_config int 'core_freq_min=500'" 2>/dev/null || true
-                  chroot /host /bin/bash -c "vcgencmd set_config int 'sdram_freq_min=500'" 2>/dev/null || true
-                  chroot /host /bin/bash -c "vcgencmd set_config int 'over_voltage_min=0'" 2>/dev/null || true
                 fi
                 
                 # Monitor throttling status
