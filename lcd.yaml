@@ -35,10 +35,10 @@ spec:
           args:
             - |
               set -euo pipefail
+              export DEBIAN_FRONTEND=noninteractive
               apt-get update -y >/dev/null
-              apt-get install -y python3-rpi.gpio >/dev/null
-              export PYTHONPATH=/usr/lib/python3/dist-packages:${PYTHONPATH:-}
-              python3 -m pip install --no-cache-dir RPLCD==1.3.1 >/dev/null
+              apt-get install -y python3-dev gcc g++ make libc6-dev >/dev/null
+              python3 -m pip install --no-cache-dir RPi.GPIO==0.7.1 RPLCD==1.3.1 >/dev/null
               exec python3 /opt/spot/lcd1602.py
           volumeMounts:
             - name: spot-node-label-config
