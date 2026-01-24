@@ -1,0 +1,73 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: spot-lcd
+  labels:
+    app.kubernetes.io/name: spot-lcd
+    app.kubernetes.io/part-of: spot
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: spot-lcd
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: spot-lcd
+        app.kubernetes.io/part-of: spot
+    spec:
+      nodeSelector:
+        kubernetes.io/arch: arm64
+        gorizond.io/robot: "true"
+        gorizond.io/spot-lcd: "true"
+      containers:
+        - name: lcd
+          image: python:3.11-slim
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            privileged: true
+            runAsUser: 0
+            runAsGroup: 0
+            allowPrivilegeEscalation: true
+          env:
+            - name: PYTHONUNBUFFERED
+              value: "1"
+          command: ["bash", "-lc"]
+          args:
+            - |
+              set -euo pipefail
+              apt-get update -y >/dev/null
+              apt-get install -y python3-rpi.gpio >/dev/null
+              python3 -m pip install --no-cache-dir RPLCD==1.3.1 >/dev/null
+              exec python3 /opt/spot/lcd1602.py
+          volumeMounts:
+            - name: spot-node-label-config
+              mountPath: /opt/spot
+              readOnly: true
+            - name: host-proc
+              mountPath: /host/proc
+              readOnly: true
+            - name: host-sys
+              mountPath: /host/sys
+              readOnly: true
+            - name: gpiomem
+              mountPath: /dev/gpiomem
+      volumes:
+        - name: spot-node-label-config
+          configMap:
+            name: spot-node-label-config
+            defaultMode: 0555
+            items:
+              - key: lcd1602.py
+                path: lcd1602.py
+        - name: host-proc
+          hostPath:
+            path: /proc
+            type: Directory
+        - name: host-sys
+          hostPath:
+            path: /sys
+            type: Directory
+        - name: gpiomem
+          hostPath:
+            path: /dev/gpiomem
+            type: CharDevice
