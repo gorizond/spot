@@ -210,7 +210,7 @@ spec:
             - name: STAND_HIP_REAR_OFFSET
               value: "0.0"
             - name: STAND_REAR_UPPER_OFFSET
-              value: "-0.12"
+              value: "0.12"
             - name: STAND_REAR_LOWER_OFFSET
               value: "-0.12"
           command: ["bash", "-lc"]
