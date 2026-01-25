@@ -64,6 +64,18 @@ def format_temp(temp_c):
     return f"{temp_c:4.1f}C"
 
 
+def reset_lcd(lcd):
+    for _ in range(2):
+        lcd.clear()
+        time.sleep(0.05)
+    lcd.home()
+    lcd.cursor_pos = (0, 0)
+    lcd.write_string(" " * LCD_COLS)
+    lcd.cursor_pos = (1, 0)
+    lcd.write_string(" " * LCD_COLS)
+    lcd.home()
+
+
 def main():
     lcd = CharLCD(
         numbering_mode=GPIO.BCM,
@@ -74,7 +86,7 @@ def main():
         pins_data=PINS_DATA,
     )
 
-    lcd.clear()
+    reset_lcd(lcd)
 
     while True:
         temp_c = read_temp_c()
