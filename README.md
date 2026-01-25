@@ -120,11 +120,18 @@ After calibration, a conservative **stand** pose is:
 python3 /opt/spot/spot_cli.py --repeat 1 stand
 ```
 
-Defaults (override via flags or env `STAND_HIP/STAND_UPPER/STAND_LOWER`):
+Defaults (override via flags or env `STAND_HIP/STAND_UPPER/STAND_LOWER/STAND_HIP_REAR_OFFSET`):
 
 - `hip=0.02`
 - `upper=0.05`
 - `lower=0.05`
+- `rear_hip_offset=0.0` (applied to `rh/lh` only)
+
+Example: move rear hips back a bit (safer stance):
+
+```bash
+python3 /opt/spot/spot_cli.py --repeat 1 stand --rear-hip-offset -0.06
+```
 
 One-leg micro-step (lift/return one leg by moving `*_lower`):
 

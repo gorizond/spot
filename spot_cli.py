@@ -14,6 +14,7 @@ from std_msgs.msg import String
 DEFAULT_STAND_HIP = float(os.environ.get("STAND_HIP", "0.02"))
 DEFAULT_STAND_UPPER = float(os.environ.get("STAND_UPPER", "0.05"))
 DEFAULT_STAND_LOWER = float(os.environ.get("STAND_LOWER", "0.05"))
+DEFAULT_STAND_HIP_REAR_OFFSET = float(os.environ.get("STAND_HIP_REAR_OFFSET", "0.0"))
 DEFAULT_LIFT_DELTA = float(os.environ.get("LIFT_DELTA", "0.10"))
 DEFAULT_WALK_ORDER = os.environ.get("WALK_ORDER", "lh,rf,lf,rh")
 
@@ -62,10 +63,13 @@ def _parse_walk_order(raw: str) -> list[str]:
     return order or ["lh", "rf", "lf", "rh"]
 
 
-def _stand_targets(hip: float, upper: float, lower: float) -> dict:
+def _stand_targets(hip: float, upper: float, lower: float, rear_hip_offset: float) -> dict:
     targets = {}
     for leg in ("rf", "lf", "rh", "lh"):
-        targets[f"{leg}_hip"] = _clamp_norm(hip)
+        hip_val = float(hip)
+        if leg in ("rh", "lh"):
+            hip_val = float(hip) + float(rear_hip_offset)
+        targets[f"{leg}_hip"] = _clamp_norm(hip_val)
         targets[f"{leg}_upper"] = _clamp_norm(upper)
         targets[f"{leg}_lower"] = _clamp_norm(lower)
     return targets
@@ -115,6 +119,7 @@ def _run_step_sequence(
     stand_hip: float,
     stand_upper: float,
     stand_lower: float,
+    stand_rear_hip_offset: float,
     leg: str,
     lift_delta: float,
     hip_swing: float,
@@ -125,7 +130,7 @@ def _run_step_sequence(
     repeat: int,
     sleep_s: float,
 ) -> None:
-    base_targets = _stand_targets(stand_hip, stand_upper, stand_lower)
+    base_targets = _stand_targets(stand_hip, stand_upper, stand_lower, stand_rear_hip_offset)
     pub.publish(_set_payload(base_targets), repeat=repeat, sleep_s=sleep_s)
     pub.sleep(max(0.0, float(return_hold_s)))
 
@@ -166,6 +171,7 @@ def _run_walk_sequence(
     stand_hip: float,
     stand_upper: float,
     stand_lower: float,
+    stand_rear_hip_offset: float,
     lift_delta: float,
     hip_swing: float,
     lift_hold_s: float,
@@ -176,7 +182,7 @@ def _run_walk_sequence(
     sleep_s: float,
     return_to_stand: bool,
 ) -> None:
-    base_targets = _stand_targets(stand_hip, stand_upper, stand_lower)
+    base_targets = _stand_targets(stand_hip, stand_upper, stand_lower, stand_rear_hip_offset)
     pub.publish(_set_payload(base_targets), repeat=repeat, sleep_s=sleep_s)
 
     for _ in range(max(1, int(steps))):
@@ -189,6 +195,7 @@ def _run_walk_sequence(
                 stand_hip=stand_hip,
                 stand_upper=stand_upper,
                 stand_lower=stand_lower,
+                stand_rear_hip_offset=stand_rear_hip_offset,
                 leg=leg,
                 lift_delta=lift_delta,
                 hip_swing=hip_swing,
@@ -233,12 +240,24 @@ def main() -> None:
     p_stand.add_argument("--hip", type=float, default=DEFAULT_STAND_HIP)
     p_stand.add_argument("--upper", type=float, default=DEFAULT_STAND_UPPER)
     p_stand.add_argument("--lower", type=float, default=DEFAULT_STAND_LOWER)
+    p_stand.add_argument(
+        "--rear-hip-offset",
+        type=float,
+        default=DEFAULT_STAND_HIP_REAR_OFFSET,
+        help="Extra hip offset for rear legs (rh/lh) only.",
+    )
 
     p_step = sub.add_parser("step", help="One safe micro-step (lift/return one leg).")
     p_step.add_argument("leg", help="Leg prefix: rf/lf/rh/lh")
     p_step.add_argument("--stand-hip", type=float, default=DEFAULT_STAND_HIP)
     p_step.add_argument("--stand-upper", type=float, default=DEFAULT_STAND_UPPER)
     p_step.add_argument("--stand-lower", type=float, default=DEFAULT_STAND_LOWER)
+    p_step.add_argument(
+        "--stand-rear-hip-offset",
+        type=float,
+        default=DEFAULT_STAND_HIP_REAR_OFFSET,
+        help="Extra hip offset for rear legs (rh/lh) only.",
+    )
     p_step.add_argument("--lift", type=float, default=DEFAULT_LIFT_DELTA)
     p_step.add_argument(
         "--hip-swing",
@@ -260,6 +279,12 @@ def main() -> None:
     p_walk.add_argument("--stand-hip", type=float, default=DEFAULT_STAND_HIP)
     p_walk.add_argument("--stand-upper", type=float, default=DEFAULT_STAND_UPPER)
     p_walk.add_argument("--stand-lower", type=float, default=DEFAULT_STAND_LOWER)
+    p_walk.add_argument(
+        "--stand-rear-hip-offset",
+        type=float,
+        default=DEFAULT_STAND_HIP_REAR_OFFSET,
+        help="Extra hip offset for rear legs (rh/lh) only.",
+    )
     p_walk.add_argument("--lift", type=float, default=DEFAULT_LIFT_DELTA)
     p_walk.add_argument(
         "--hip-swing",
@@ -306,7 +331,12 @@ def main() -> None:
             return
 
         if args.command == "stand":
-            targets = _stand_targets(args.hip, args.upper, args.lower)
+            targets = _stand_targets(
+                args.hip,
+                args.upper,
+                args.lower,
+                args.rear_hip_offset,
+            )
             pub.publish(_set_payload(targets), repeat=args.repeat, sleep_s=args.sleep)
             return
 
@@ -316,6 +346,7 @@ def main() -> None:
                 stand_hip=args.stand_hip,
                 stand_upper=args.stand_upper,
                 stand_lower=args.stand_lower,
+                stand_rear_hip_offset=args.stand_rear_hip_offset,
                 leg=args.leg,
                 lift_delta=args.lift,
                 hip_swing=args.hip_swing,
@@ -337,6 +368,7 @@ def main() -> None:
                 stand_hip=args.stand_hip,
                 stand_upper=args.stand_upper,
                 stand_lower=args.stand_lower,
+                stand_rear_hip_offset=args.stand_rear_hip_offset,
                 lift_delta=args.lift,
                 hip_swing=args.hip_swing,
                 lift_hold_s=args.lift_hold,

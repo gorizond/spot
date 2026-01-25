@@ -207,6 +207,8 @@ spec:
               value: "0.05"
             - name: STAND_LOWER
               value: "0.05"
+            - name: STAND_HIP_REAR_OFFSET
+              value: "-0.06"
           command: ["bash", "-lc"]
           args:
             - |
