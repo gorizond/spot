@@ -31,6 +31,8 @@ STAND_HIP = _parse_float(os.environ.get("STAND_HIP", "0.02"), 0.02)
 STAND_UPPER = _parse_float(os.environ.get("STAND_UPPER", "0.05"), 0.05)
 STAND_LOWER = _parse_float(os.environ.get("STAND_LOWER", "0.05"), 0.05)
 STAND_HIP_REAR_OFFSET = _parse_float(os.environ.get("STAND_HIP_REAR_OFFSET", "0.0"), 0.0)
+STAND_REAR_UPPER_OFFSET = _parse_float(os.environ.get("STAND_REAR_UPPER_OFFSET", "0.0"), 0.0)
+STAND_REAR_LOWER_OFFSET = _parse_float(os.environ.get("STAND_REAR_LOWER_OFFSET", "0.0"), 0.0)
 
 GAIN = _parse_float(os.environ.get("CHAMP_GAIN", "0.25"), 0.25)
 PUBLISH_HZ = _parse_float(os.environ.get("CHAMP_BRIDGE_HZ", "50"), 50.0)
@@ -124,6 +126,8 @@ class ChampBridge(Node):
             "lower": float(_clamp(STAND_LOWER, -1.0, 1.0)),
         }
         self._stand_rear_hip_offset = float(_clamp(STAND_HIP_REAR_OFFSET, -1.0, 1.0))
+        self._stand_rear_upper_offset = float(_clamp(STAND_REAR_UPPER_OFFSET, -1.0, 1.0))
+        self._stand_rear_lower_offset = float(_clamp(STAND_REAR_LOWER_OFFSET, -1.0, 1.0))
 
         qos_joint_states = QoSProfile(
             history=HistoryPolicy.KEEP_LAST,
@@ -139,7 +143,7 @@ class ChampBridge(Node):
         self.create_timer(self._publish_period_s, self._tick)
 
         self.get_logger().info(
-            "starting; joint_states=%s status=%s cmd=%s publish_hz=%.1f gain=%.2f stand=(%.3f/%.3f/%.3f) rear_hip_offset=%.3f"
+            "starting; joint_states=%s status=%s cmd=%s publish_hz=%.1f gain=%.2f stand=(%.3f/%.3f/%.3f) rear_hip_offset=%.3f rear_upper_offset=%.3f rear_lower_offset=%.3f"
             % (
                 joint_states_topic,
                 status_topic,
@@ -150,6 +154,8 @@ class ChampBridge(Node):
                 self._stand["upper"],
                 self._stand["lower"],
                 self._stand_rear_hip_offset,
+                self._stand_rear_upper_offset,
+                self._stand_rear_lower_offset,
             )
         )
 
@@ -215,6 +221,8 @@ class ChampBridge(Node):
         ranges = self._ranges
         stand = self._stand
         rear_hip_offset = self._stand_rear_hip_offset
+        rear_upper_offset = self._stand_rear_upper_offset
+        rear_lower_offset = self._stand_rear_lower_offset
         gain = self._gain
 
         targets: dict[str, float] = {}
@@ -231,8 +239,13 @@ class ChampBridge(Node):
             scaled = float(_clamp(scaled, -1.0, 1.0))
 
             stand_base = stand[kind]
-            if kind == "hip" and out_name in ("rh_hip", "lh_hip"):
-                stand_base = stand_base + rear_hip_offset
+            if out_name in ("rh_hip", "lh_hip"):
+                if kind == "hip":
+                    stand_base = stand_base + rear_hip_offset
+                elif kind == "upper":
+                    stand_base = stand_base + rear_upper_offset
+                elif kind == "lower":
+                    stand_base = stand_base + rear_lower_offset
             out = stand_base + scaled * gain
             out = float(_clamp(out, -1.0, 1.0))
             targets[out_name] = out
