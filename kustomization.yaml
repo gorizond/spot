@@ -14,6 +14,7 @@ configMapGenerator:
       - node_label_config.py
       - servo_driver.py
       - spot_cli.py
+      - cmd_mux.py
       - lcd1602.py
       - champ_bridge.py
       - spotmicroai.urdf.xacro

@@ -11,9 +11,10 @@ This repo is intentionally minimal.
 - `ros2-smoke` (core):
   - `node-label-config`: reads **Kubernetes Node labels** of *its own node* (RBAC-enabled), converts them into a PCA9685 servo mapping, and publishes it to `/spot/config/servo_map` (reacts to label changes via watch; no pod restart).
   - `servo-driver`: subscribes to `/spot/config/servo_map`, drives **PCA9685** over I2C (`/dev/i2c-1`), accepts JSON commands on `/spot/cmd/servo`, and publishes status to `/spot/state/servo` (runs privileged for I2C access).
+  - `cmd-mux`: routes commands to `/spot/cmd/servo` from **manual** (`/spot/cmd/servo_manual`) or **auto** (`/spot/cmd/servo_auto`) based on `/spot/ctrl/mode`.
 - `spot-champ` (optional):
   - `champ-controller`: runs CHAMP gait controller (`joint_states`, `/cmd_vel`, etc).
-  - `champ-bridge`: bridges CHAMP `joint_states` to `servo-driver` commands on `/spot/cmd/servo`.
+  - `champ-bridge`: bridges CHAMP `joint_states` to `/spot/cmd/servo_auto` (applied only when mux is in `auto`).
 
 Safety defaults:
 
@@ -80,19 +81,25 @@ kubectl -n spot-system exec -it ds/ros2-smoke -c servo-driver -- bash
 source /opt/ros/kilted/setup.bash
 ```
 
-4) (Optional) Reset targets to home (0.0):
+4) Switch to **manual** mode (so CHAMP does not overwrite your commands):
+
+```bash
+ros2 topic pub /spot/ctrl/mode std_msgs/msg/String "data: manual" -1
+```
+
+5) (Optional) Reset targets to home (0.0):
 
 ```bash
 python3 /opt/spot/spot_cli.py --repeat 1 home
 ```
 
-5) Arm (does not move anything until you `set` a joint):
+6) Arm (does not move anything until you `set` a joint):
 
 ```bash
 python3 /opt/spot/spot_cli.py --repeat 1 arm
 ```
 
-6) Enable + move one joint with small steps (calibration-friendly):
+7) Enable + move one joint with small steps (calibration-friendly):
 
 ```bash
 python3 /opt/spot/spot_cli.py --repeat 1 set-us rf_hip=1500
@@ -100,7 +107,7 @@ python3 /opt/spot/spot_cli.py --repeat 1 set-us rf_hip=1510
 python3 /opt/spot/spot_cli.py --repeat 1 set-us rf_hip=1500
 ```
 
-7) Disarm when done (note: may drop torque if `DISARM_FULL_OFF=1`):
+8) Disarm when done (note: may drop torque if `DISARM_FULL_OFF=1`):
 
 ```bash
 python3 /opt/spot/spot_cli.py disarm
@@ -161,7 +168,7 @@ python3 /opt/spot/spot_cli.py --repeat 1 walk --steps 1 --hip-swing 0.03
 
 ## CHAMP gait (walk via `/cmd_vel`)
 
-This uses CHAMP (model-based gait controller) and bridges its `joint_states` to the low-level `servo-driver`.
+This uses CHAMP (model-based gait controller) and bridges its `joint_states` to the low-level `servo-driver` via the command mux.
 
 ### Enable/disable
 
@@ -190,12 +197,14 @@ Then, drive the gait by publishing `/cmd_vel` (start small):
 kubectl -n spot-system exec -it ds/spot-champ -c champ-controller -- bash
 source /opt/ros/kilted/setup.bash
 [ -f /ws/install/setup.bash ] && source /ws/install/setup.bash
+ros2 topic pub /spot/ctrl/mode std_msgs/msg/String "data: auto" -1
 ros2 topic pub /cmd_vel geometry_msgs/msg/Twist '{linear: {x: 0.05}}' -r 2
 ```
 
 Notes:
 
 - `champ-bridge` publishes servo targets only when `servo-driver` is `armed=true`.
+- Manual vs auto is controlled by `/spot/ctrl/mode` (`auto` or `manual`).
 - Tune bridge scaling via env on `champ-bridge`: `CHAMP_GAIN`, `CHAMP_*_RANGE_RAD`, `STAND_*`.
 
 ## Verify
@@ -209,6 +218,7 @@ Notes:
 ```bash
 ros2 topic echo /spot/config/servo_map --once
 ros2 topic echo /spot/state/servo --once
+ros2 topic echo /spot/state/mux --once
 ```
 
 ## Command format
@@ -222,4 +232,5 @@ ros2 topic echo /spot/state/servo --once
   - normalized: `{"cmd":"set","mode":"norm","targets":{"rf_hip":0.1}}` (range `-1..1`)
   - microseconds: `{"cmd":"set","mode":"us","targets":{"rf_hip":1500}}`
 
+For manual control (via mux), publish to `/spot/cmd/servo_manual` (default in `spot_cli.py`).
 For convenience inside the pod, use `python3 /opt/spot/spot_cli.py ...`.

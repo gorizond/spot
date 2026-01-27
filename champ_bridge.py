@@ -280,7 +280,7 @@ def main() -> None:
     )
     parser.add_argument("--joint-states-topic", default="/joint_states")
     parser.add_argument("--status-topic", default="/spot/state/servo")
-    parser.add_argument("--cmd-topic", default="/spot/cmd/servo")
+    parser.add_argument("--cmd-topic", default="/spot/cmd/servo_auto")
     parser.add_argument("--publish-hz", type=float, default=PUBLISH_HZ)
     parser.add_argument("--gain", type=float, default=GAIN)
     parser.add_argument("--hip-range", type=float, default=HIP_RANGE_RAD)

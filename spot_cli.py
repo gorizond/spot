@@ -216,7 +216,10 @@ def _run_walk_sequence(
 
 
 def main() -> None:
-    default_topic = os.environ.get("CMD_TOPIC", "/spot/cmd/servo").strip() or "/spot/cmd/servo"
+    default_topic = (
+        os.environ.get("CMD_TOPIC", "/spot/cmd/servo_manual").strip()
+        or "/spot/cmd/servo_manual"
+    )
 
     parser = argparse.ArgumentParser(
         description="Spot servo command helper (publishes JSON to std_msgs/String)."

@@ -114,6 +114,36 @@ spec:
               readOnly: true
             - name: i2c-1
               mountPath: /dev/i2c-1
+        - name: cmd-mux
+          image: ros:kilted-ros-base
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: PYTHONUNBUFFERED
+              value: "1"
+            - name: AUTO_TOPIC
+              value: "/spot/cmd/servo_auto"
+            - name: MANUAL_TOPIC
+              value: "/spot/cmd/servo_manual"
+            - name: OUT_TOPIC
+              value: "/spot/cmd/servo"
+            - name: MODE_TOPIC
+              value: "/spot/ctrl/mode"
+            - name: STATUS_TOPIC
+              value: "/spot/state/mux"
+            - name: DEFAULT_MODE
+              value: "auto"
+            - name: MANUAL_TIMEOUT_S
+              value: "0"
+          command: ["bash", "-lc"]
+          args:
+            - |
+              set -eo pipefail
+              source /opt/ros/kilted/setup.bash
+              exec python3 /opt/spot/cmd_mux.py
+          volumeMounts:
+            - name: spot-node-label-config
+              mountPath: /opt/spot
+              readOnly: true
       volumes:
         - name: spot-node-label-config
           configMap:
