@@ -30,9 +30,9 @@ Pods are scheduled only on nodes matching:
 
 ## Hardware notes (power)
 
-- Power the RPi4 from a dedicated `5.1–5.2V` regulator (>= `3A`), ideally from the 2S battery directly.
-- Keep servo power (`PCA9685 V+` / servos) on a separate `6V` BEC; tie grounds at a star point.
-- Brownouts often show up as boot-loops; measure 5V at the GPIO 5V/GND pins under load.
+- RPi4 power: XL4015 fed directly from 2S (thick wires) to avoid voltage sag/heat.
+- Servo power (`PCA9685 V+` / servos): separate `6V` UBEC; tie grounds at a star point.
+- Brownouts show up as boot-loops; measure 5V at the GPIO 5V/GND pins under load.
 
 ## Deploy with Fleet
 
@@ -75,13 +75,20 @@ For the current SpotMicro wiring, **CH6–CH9 are empty** (leave `ch6-joint..ch9
 kubectl -n spot-system exec -it ds/ros2-smoke -c servo-driver -- bash
 ```
 
+If you need a one-liner (non-interactive), use:
+
+```bash
+kubectl -n spot-system exec ds/ros2-smoke -c servo-driver -- bash -lc 'source /opt/ros/kilted/setup.bash && ros2 topic list'
+```
+
 3) Source ROS 2 environment (required for `rclpy` / `ros2` commands):
 
 ```bash
 source /opt/ros/kilted/setup.bash
 ```
 
-4) Switch to **manual** mode (so CHAMP does not overwrite your commands):
+4) Switch to **manual** mode (so CHAMP does not overwrite your commands).
+Default mux mode is `auto`, so manual control requires this:
 
 ```bash
 ros2 topic pub /spot/ctrl/mode std_msgs/msg/String "data: manual" -1
@@ -117,6 +124,21 @@ If something goes wrong:
 
 ```bash
 python3 /opt/spot/spot_cli.py estop
+```
+
+### Known-good manual bend (front-right leg example)
+
+Use limits from `/spot/config/servo_map` or node labels (`gorizond.io/spot-pca9685-ch*-us`).
+On `spot-5`, a full front-right bend was visible with:
+
+```bash
+python3 /opt/spot/spot_cli.py --repeat 1 set-us rf_hip=500 rf_upper=2500 rf_lower=2450
+```
+
+Return to a neutral-ish pose:
+
+```bash
+python3 /opt/spot/spot_cli.py --repeat 1 set-us rf_hip=500 rf_upper=1000 rf_lower=1500
 ```
 
 ## Stand + micro-steps
@@ -206,6 +228,15 @@ Notes:
 - `champ-bridge` publishes servo targets only when `servo-driver` is `armed=true`.
 - Manual vs auto is controlled by `/spot/ctrl/mode` (`auto` or `manual`).
 - Tune bridge scaling via env on `champ-bridge`: `CHAMP_GAIN`, `CHAMP_*_RANGE_RAD`, `STAND_*`.
+
+## Command mux (manual vs auto)
+
+- `cmd-mux` listens:
+  - manual: `/spot/cmd/servo_manual` (default for `spot_cli.py`)
+  - auto: `/spot/cmd/servo_auto` (used by `champ-bridge`)
+  - output: `/spot/cmd/servo`
+- Default mode is `auto`. Switch to `manual` before issuing direct commands.
+- Optional: `MANUAL_TIMEOUT_S` can auto-return to `auto` after inactivity.
 
 ## Verify
 
