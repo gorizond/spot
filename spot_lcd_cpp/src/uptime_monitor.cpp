@@ -2,6 +2,9 @@
 #include <fstream>
 #include <sstream>
 #include <cmath>
+#include <chrono>
+#include <sys/sysctl.h>
+#include <time.h>
 
 UptimeMonitor::UptimeMonitor(Callback callback, const UptimeMonitorConfig& config) 
     : callback_(callback), config_(config) {}
@@ -18,6 +21,7 @@ void UptimeMonitor::startMonitoring() {
 }
 
 std::string UptimeMonitor::getSystemUptime() {
+    // Попробуем получить аптайм для Linux
     std::ifstream uptimeFile("/proc/uptime");
     if (uptimeFile.is_open()) {
         std::string uptimeStr;
@@ -43,5 +47,34 @@ std::string UptimeMonitor::getSystemUptime() {
         
         return oss.str();
     }
-    return "0m"; // значение по умолчанию
+    // Для macOS используем sysctl
+    else {
+        struct timeval boottime;
+        size_t len = sizeof(boottime);
+        int mib[2] = {CTL_KERN, KERN_BOOTTIME};
+        
+        if (sysctl(mib, 2, &boottime, &len, NULL, 0) == 0) {
+            time_t bsec = boottime.tv_sec;
+            time_t current = time(NULL);
+            int totalSeconds = static_cast<int>(current - bsec);
+            
+            int days = totalSeconds / 86400;
+            int hours = (totalSeconds % 86400) / 3600;
+            int minutes = (totalSeconds % 3600) / 60;
+            
+            std::ostringstream oss;
+            if (days > 0) {
+                oss << days << "d " << hours << "h " << minutes << "m";
+            } else if (hours > 0) {
+                oss << hours << "h " << minutes << "m";
+            } else {
+                oss << minutes << "m";
+            }
+            
+            return oss.str();
+        }
+    }
+    
+    // Значение по умолчанию
+    return "0m";
 }

@@ -11,6 +11,7 @@
 #include <fstream>
 #include <sstream>
 #include <map>
+#include <vector>
 
 // Configuration structures
 struct LcdConfig {
