@@ -7,7 +7,6 @@ RUN apt-get update && apt-get install -y \
     cmake \
     git \
     pkg-config \
-    libwiringpi-dev \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -18,8 +17,8 @@ COPY ../../../spot_lcd_cpp /app/src
 # Создаем директорию для сборки
 WORKDIR /app/build
 
-# Конфигурируем и собираем проект
-RUN cmake /app/src -DENABLE_GPIO=ON -DCMAKE_BUILD_TYPE=Release && \
+# Конфигурируем и собираем проект (в режиме симуляции)
+RUN cmake /app/src -DENABLE_GPIO=OFF -DCMAKE_BUILD_TYPE=Release && \
     make -j$(nproc) && \
     make install
 
@@ -30,7 +29,6 @@ FROM ubuntu:24.04
 RUN apt-get update && apt-get install -y \
     libstdc++6 \
     libc6 \
-    libwiringpi3 \
     && rm -rf /var/lib/apt/lists/*
 
 # Копируем исполняемый файл из стадии сборки
