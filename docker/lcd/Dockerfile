@@ -13,8 +13,8 @@ RUN set -eux; \
 WORKDIR /app
 
 # Копируем файлы для сборки
-COPY spot_lcd_node/Cargo.toml Cargo.toml
-COPY spot_lcd_node/Cargo.lock Cargo.lock
+COPY spot_lcd_node/Cargo.toml .
+COPY spot_lcd_node/Cargo.lock .
 COPY spot_lcd_node/src src
 
 # Устанавливаем аргумент FEATURES с значением по умолчанию
