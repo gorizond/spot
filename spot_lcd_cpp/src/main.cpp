@@ -48,6 +48,10 @@ int main(int argc, char *argv[]) {
         display_service->startDisplayLoop();
     }
     
+    // Создаем мониторы
+    std::unique_ptr<TempMonitor> temp_monitor;
+    std::unique_ptr<UptimeMonitor> uptime_monitor;
+    
     if (run_temp) {
         auto temp_callback = [&display_service](const std::string& temp) {
             if (display_service) {
@@ -58,8 +62,8 @@ int main(int argc, char *argv[]) {
             }
         };
         
-        TempMonitor temp_monitor(temp_callback, config.temp_monitor);
-        temp_monitor.startMonitoring();
+        temp_monitor = std::make_unique<TempMonitor>(temp_callback, config.temp_monitor);
+        temp_monitor->startMonitoring();
     }
     
     if (run_uptime) {
@@ -72,8 +76,8 @@ int main(int argc, char *argv[]) {
             }
         };
         
-        UptimeMonitor uptime_monitor(uptime_callback, config.uptime_monitor);
-        uptime_monitor.startMonitoring();
+        uptime_monitor = std::make_unique<UptimeMonitor>(uptime_callback, config.uptime_monitor);
+        uptime_monitor->startMonitoring();
     }
     
     // Ждем бесконечно
