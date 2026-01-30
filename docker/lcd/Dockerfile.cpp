@@ -29,6 +29,7 @@ FROM ubuntu:24.04
 RUN apt-get update && apt-get install -y \
     libstdc++6 \
     libc6 \
+    libgcc-s1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Копируем исполняемый файл из стадии сборки
