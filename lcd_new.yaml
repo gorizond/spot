@@ -1,0 +1,80 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: lcd-config
+  namespace: spot-robot
+data:
+  lcd_config.toml: |
+    # Configuration for LCD display
+    [lcd]
+    pin_rs = 25
+    pin_en = 24
+    pins_data = [23, 17, 18, 22]
+    cols = 16
+    rows = 2
+    
+    [temp_monitor]
+    interval = 5
+    
+    [uptime_monitor]
+    interval = 10
+    
+    [ros_publisher]
+    temp_topic = "lcd_temperature"
+    uptime_topic = "lcd_uptime"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lcd-deployment
+  namespace: spot-robot
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: lcd-display
+  template:
+    metadata:
+      labels:
+        app: lcd-display
+    spec:
+      nodeSelector:
+        kubernetes.io/arch: arm64
+        gorizond.io/robot: "true"
+        gorizond.io/spot-lcd: "true"
+      containers:
+      - name: lcd-display
+        image: spot_lcd_rust:latest
+        imagePullPolicy: Never
+        securityContext:
+          privileged: true
+          runAsUser: 0
+          runAsGroup: 0
+          allowPrivilegeEscalation: true
+        volumeMounts:
+        - name: lcd-config-volume
+          mountPath: /app/config
+        - name: host-proc
+          mountPath: /host/proc
+          readOnly: true
+        - name: host-sys
+          mountPath: /host/sys
+          readOnly: true
+        - name: gpiomem
+          mountPath: /dev/gpiomem
+      volumes:
+      - name: lcd-config-volume
+        configMap:
+          name: lcd-config
+      - name: host-proc
+        hostPath:
+          path: /proc
+          type: Directory
+      - name: host-sys
+        hostPath:
+          path: /sys
+          type: Directory
+      - name: gpiomem
+        hostPath:
+          path: /dev/gpiomem
+          type: CharDevice

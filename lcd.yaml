@@ -1,18 +1,45 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: spot-lcd-rust-config
+  labels:
+    app.kubernetes.io/name: spot-lcd-rust
+    app.kubernetes.io/part-of: spot
+data:
+  lcd_config.toml: |
+    # Configuration for LCD display
+    [lcd]
+    pin_rs = 25
+    pin_en = 24
+    pins_data = [23, 17, 18, 22]
+    cols = 16
+    rows = 2
+    
+    [temp_monitor]
+    interval = 5
+    
+    [uptime_monitor]
+    interval = 10
+    
+    [ros_publisher]
+    temp_topic = "lcd_temperature"
+    uptime_topic = "lcd_uptime"
+---
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: spot-lcd
+  name: spot-lcd-rust
   labels:
-    app.kubernetes.io/name: spot-lcd
+    app.kubernetes.io/name: spot-lcd-rust
     app.kubernetes.io/part-of: spot
 spec:
   selector:
     matchLabels:
-      app.kubernetes.io/name: spot-lcd
+      app.kubernetes.io/name: spot-lcd-rust
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: spot-lcd
+        app.kubernetes.io/name: spot-lcd-rust
         app.kubernetes.io/part-of: spot
     spec:
       nodeSelector:
@@ -20,30 +47,25 @@ spec:
         gorizond.io/robot: "true"
         gorizond.io/spot-lcd: "true"
       containers:
-        - name: lcd
-          image: python:3.11-slim
-          imagePullPolicy: IfNotPresent
+        - name: lcd-display
+          image: ghcr.io/gorizond/spot-lcd-rust:latest
+          imagePullPolicy: Always
+          command:
+          - /usr/local/bin/spot_lcd_node
+          args:
+          - --module
+          - all
           securityContext:
             privileged: true
             runAsUser: 0
             runAsGroup: 0
             allowPrivilegeEscalation: true
           env:
-            - name: PYTHONUNBUFFERED
-              value: "1"
-          command: ["bash", "-lc"]
-          args:
-            - |
-              set -euo pipefail
-              export DEBIAN_FRONTEND=noninteractive
-              apt-get update -y >/dev/null
-              apt-get install -y python3-dev gcc g++ make libc6-dev >/dev/null
-              python3 -m pip install --no-cache-dir RPi.GPIO==0.7.1 RPLCD==1.3.1 >/dev/null
-              exec python3 /opt/spot/lcd1602.py
+            - name: RUST_LOG
+              value: "info"
           volumeMounts:
-            - name: spot-node-label-config
-              mountPath: /opt/spot
-              readOnly: true
+            - name: spot-lcd-rust-config-volume
+              mountPath: /app/config
             - name: host-proc
               mountPath: /host/proc
               readOnly: true
@@ -53,13 +75,9 @@ spec:
             - name: gpiomem
               mountPath: /dev/gpiomem
       volumes:
-        - name: spot-node-label-config
+        - name: spot-lcd-rust-config-volume
           configMap:
-            name: spot-node-label-config
-            defaultMode: 0555
-            items:
-              - key: lcd1602.py
-                path: lcd1602.py
+            name: spot-lcd-rust-config
         - name: host-proc
           hostPath:
             path: /proc

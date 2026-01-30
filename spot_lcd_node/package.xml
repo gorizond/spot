@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>spot_lcd_node</name>
+  <version>0.1.0</version>
+  <description>Rust-based LCD display service for Spot robot with microservices architecture</description>
+  <maintainer email="negash@yandex.ru">negash</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>ament_cargo</buildtool_depend>
+
+  <depend>std_msgs</depend>
+  <depend>rclpy</depend>
+
+  <export>
+    <build_type>ament_cargo</build_type>
+  </export>
+</package>

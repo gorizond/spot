@@ -1,8 +1,60 @@
-# gorizond/spot
+# Spot Robot Stack
 
 Robot stack for SpotMicro/Spot running **ROS 2 Kilted** on **k3s (Raspberry Pi)**, deployed via **Rancher Fleet** (GitOps).
 
 This repo is intentionally minimal.
+
+## LCD Service
+
+This repository now includes a microservice architecture implementation for controlling an LCD1602 display on the Spot robot using Rust.
+
+### Architecture Overview
+
+The LCD service follows a microservice architecture with the following components:
+
+- `lcd_core`: Low-level LCD hardware interface
+- `lcd_display_service`: High-level display management
+- `temp_monitor`: Temperature monitoring service
+- `uptime_monitor`: System uptime monitoring service
+- `ros_publisher`: ROS2 topic publishing
+- `config`: Configuration management
+
+### Features
+
+- Written in safe Rust for memory safety
+- Configurable via TOML files
+- Dockerized with multistage build for minimal footprint
+- Kubernetes-ready deployment manifests
+- GPIO control for Raspberry Pi
+- Selective module loading via command-line arguments
+
+### Module Selection
+
+The LCD service supports selective module loading through command-line arguments:
+
+```bash
+# Run all modules
+./spot_lcd_node --module all
+
+# Run specific modules only (comma-separated)
+./spot_lcd_node --module temp,uptime
+
+# Run only LCD display
+./spot_lcd_node --module lcd
+
+# Run only temperature and LCD
+./spot_lcd_node --module temp,lcd
+```
+
+This allows for flexible deployments depending on the required functionality.
+
+### Docker and CI/CD
+
+The LCD service is fully integrated with GitHub Actions for automated building and publishing:
+
+- Docker images are automatically built and published to GitHub Container Registry
+- Workflow triggers on changes to LCD-related files
+- Images tagged with branch names, semantic versions, and git SHAs
 
 ## What runs
 
@@ -260,7 +312,7 @@ ros2 topic echo /spot/state/mux --once
 - estop: `{"cmd":"estop","value":true}` / `{"cmd":"estop","value":false}`
 - home: `{"cmd":"home"}`
 - set targets (also enables those joints):
-  - normalized: `{"cmd":"set","mode":"norm","targets":{"rf_hip":0.1}}` (range `-1..1`)
+    - normalized: `{"cmd":"set","mode":"norm","targets":{"rf_hip":0.1}}` (range `-1..1`)
   - microseconds: `{"cmd":"set","mode":"us","targets":{"rf_hip":1500}}`
 
 For manual control (via mux), publish to `/spot/cmd/servo_manual` (default in `spot_cli.py`).
