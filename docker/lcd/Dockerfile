@@ -1,7 +1,7 @@
 # Stage 1: Build stage
 FROM rust:1.70-bookworm AS builder
 
-SHELL ["/bin/bash", "-lc"]
+SHELL ["/bin/bash", "-c"]
 
 # Устанавливаем Rust
 RUN set -eux; \
@@ -41,7 +41,7 @@ RUN cargo build --release --features ros2
 # Stage 2: Runtime stage
 FROM debian:bookworm-slim
 
-SHELL ["/bin/bash", "-lc"]
+SHELL ["/bin/bash", "-c"]
 
 # Устанавливаем зависимости для rppal
 RUN set -eux; \
