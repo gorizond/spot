@@ -28,6 +28,7 @@ FROM ubuntu:24.04
 # Устанавливаем минимальные зависимости для работы
 RUN apt-get update && apt-get install -y \
     libstdc++6 \
+    libc6 \
     && rm -rf /var/lib/apt/lists/*
 
 # Копируем исполняемый файл из стадии сборки
