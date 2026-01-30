@@ -12,16 +12,13 @@ RUN set -eux; \
 
 WORKDIR /app
 
-# Копируем файлы для сборки
-COPY ./spot_lcd_node/Cargo.toml ./Cargo.toml
-COPY ./spot_lcd_node/Cargo.lock ./Cargo.lock
-COPY ./spot_lcd_node/src ./src
+# Копируем специальный Cargo.toml для standalone версии и исходники
+COPY ./spot_lcd_node/standalone/Cargo.toml ./Cargo.toml
+COPY ./spot_lcd_node/standalone/Cargo.lock ./Cargo.lock
+COPY ./spot_lcd_node/standalone/src ./src
 
-# Устанавливаем аргумент FEATURES с значением по умолчанию
-ARG FEATURES=standalone
-
-# Собираем с указанной фичей (по умолчанию standalone)
-RUN cargo build --release --features ${FEATURES}
+# Собираем standalone версию
+RUN cargo build --release --features standalone
 
 # Stage 2: Runtime stage
 FROM debian:bookworm-slim

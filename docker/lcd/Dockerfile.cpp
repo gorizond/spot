@@ -38,7 +38,7 @@ RUN useradd --create-home --shell /bin/bash app
 WORKDIR /app
 
 # Копируем конфигурацию
-COPY ./spot_lcd_node/config /app/config
+COPY ./spot_lcd_cpp/config /app/config
 
 # Меняем владельца файлов
 RUN chown -R app:app /app

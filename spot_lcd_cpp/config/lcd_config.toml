@@ -1,0 +1,13 @@
+# Configuration for LCD display
+[lcd]
+pin_rs = 25
+pin_en = 24
+pins_data = [23, 17, 18, 22]
+cols = 16
+rows = 2
+
+[temp_monitor]
+interval = 5
+
+[uptime_monitor]
+interval = 10

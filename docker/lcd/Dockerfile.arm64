@@ -1,0 +1,67 @@
+# Stage 1: Build stage
+FROM rust:1.85-bookworm AS builder
+
+# Устанавливаем зависимости для cross-compilation для ARM
+RUN set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends \
+      gcc-aarch64-linux-gnu \
+      libc6-dev-arm64-cross \
+      libudev-dev:arm64 \
+      libdbus-1-dev:arm64 \
+    ; \
+    rm -rf /var/lib/apt/lists/*
+
+# Настройка cross-compilation для ARM64
+ENV CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc
+ENV CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc
+ENV CXX_aarch64_unknown_linux_gnu=aarch64-linux-gnu-g++
+
+# Добавляем target для ARM64
+RUN rustup target add aarch64-unknown-linux-gnu
+
+WORKDIR /app
+
+# Копируем специальный Cargo.toml для pure standalone версии и исходники
+COPY ./spot_lcd_node/pure_standalone/Cargo.toml ./Cargo.toml
+COPY ./spot_lcd_node/pure_standalone/main.rs ./main.rs
+COPY ./spot_lcd_node/pure_standalone/config ./config
+COPY ./spot_lcd_node/pure_standalone/lcd_core ./lcd_core
+COPY ./spot_lcd_node/pure_standalone/lcd_display_service ./lcd_display_service
+COPY ./spot_lcd_node/pure_standalone/temp_monitor ./temp_monitor
+COPY ./spot_lcd_node/pure_standalone/uptime_monitor ./uptime_monitor
+
+# Собираем standalone версию для ARM64
+RUN cargo build --release --target aarch64-unknown-linux-gnu
+
+# Stage 2: Runtime stage
+FROM --platform=$TARGETPLATFORM debian:bookworm-slim
+
+# Устанавливаем зависимости для rppal в runtime
+RUN set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends \
+      libudev1 \
+      ca-certificates \
+      libdbus-1-3 \
+    ; \
+    rm -rf /var/lib/apt/lists/*
+
+# Копируем бинарник из стадии сборки
+COPY --from=builder /app/target/aarch64-unknown-linux-gnu/release/spot_lcd_node /usr/local/bin/
+
+# Создаем пользователя
+RUN useradd --create-home --shell /bin/bash app
+
+# Устанавливаем рабочую директорию
+WORKDIR /app
+
+# Копируем конфигурацию
+COPY ./spot_lcd_node/config /app/config
+
+# Меняем владельца файлов
+RUN chown -R app:app /app
+USER app
+
+# Точка входа
+ENTRYPOINT ["/usr/local/bin/spot_lcd_node"]

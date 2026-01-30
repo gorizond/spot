@@ -20,5 +20,5 @@ clap = { version = "4.0", features = ["derive"] }
 rppal = { version = "0.11", features = ["hal"] }
 
 [features]
-default = []
+default = ["standalone"]
 standalone = []

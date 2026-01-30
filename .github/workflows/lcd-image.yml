@@ -52,12 +52,20 @@ jobs:
             type=ref,event=pr
             type=sha,prefix=
 
+<<<<<<< HEAD
       - name: Build and push Docker image (C++ version)
+=======
+      - name: Build and push Docker image (ARM64 cross-compilation)
+>>>>>>> origin/main
         id: push
         uses: docker/build-push-action@v5
         with:
           context: .
+<<<<<<< HEAD
           file: ./docker/lcd/Dockerfile.cpp
+=======
+          file: ./docker/lcd/Dockerfile.arm64
+>>>>>>> origin/main
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
