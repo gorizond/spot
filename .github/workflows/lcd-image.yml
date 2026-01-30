@@ -50,12 +50,12 @@ jobs:
             type=ref,event=pr
             type=sha,prefix=
 
-      - name: Build and push Docker image (standalone version)
+      - name: Build and push Docker image (simple standalone version)
         id: push
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./docker/lcd/Dockerfile.standalone
+          file: ./docker/lcd/Dockerfile.simple
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
