@@ -20,8 +20,7 @@ WORKDIR /app/build
 
 # Конфигурируем и собираем проект (с GPIO поддержкой)
 RUN cmake /app/src -DENABLE_GPIO=ON -DCMAKE_BUILD_TYPE=Release && \
-    make -j$(nproc) && \
-    make install
+    make -j$(nproc)
 
 # Stage 2: Runtime stage
 FROM ubuntu:22.04
@@ -29,13 +28,12 @@ FROM ubuntu:22.04
 # Устанавливаем зависимости для работы
 RUN apt-get update && apt-get install -y \
     libstdc++6 \
-    libc6 \
     libgcc-s1 \
-    libwiringpi3 \
+    wiringpi \
     && rm -rf /var/lib/apt/lists/*
 
 # Копируем исполняемый файл из стадии сборки
-COPY --from=builder /usr/local/bin/spot_lcd_node /usr/local/bin/
+COPY --from=builder /app/build/spot_lcd_node /usr/local/bin/
 COPY --from=builder /app/src/config /app/config
 
 # Устанавливаем рабочую директорию
