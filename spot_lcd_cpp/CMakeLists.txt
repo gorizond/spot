@@ -52,4 +52,6 @@ if(ENABLE_GPIO)
     endif()
 else()
     target_compile_definitions(${PROJECT_NAME} PRIVATE USE_GPIO=0)
+    # Ensure basic libraries are linked even without GPIO
+    target_link_libraries(${PROJECT_NAME} pthread)
 endif()
