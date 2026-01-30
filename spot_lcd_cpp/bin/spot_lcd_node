@@ -1,2 +1,27 @@
-#!/bin/sh
-echo "Placeholder binary - real binary will be built separately"
+#!/bin/bash
+# Фиктивный исполняемый файл для тестирования
+
+echo "Spot LCD C++ Service Starting..."
+echo "Arguments: $@"
+
+# Парсим аргументы
+MODULES="all"
+while getopts "m:" opt; do
+  case $opt in
+    m)
+      MODULES="$OPTARG"
+      ;;
+    \?)
+      echo "Invalid option: -$OPTARG" >&2
+      exit 1
+      ;;
+  esac
+done
+
+echo "Running modules: $MODULES"
+
+# Бесконечный цикл, чтобы контейнер не завершался
+while true; do
+  sleep 10
+  echo "LCD Service running..."
+done
