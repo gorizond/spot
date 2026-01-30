@@ -1,0 +1,2 @@
+#!/bin/sh
+echo "Placeholder binary - real binary will be built separately"

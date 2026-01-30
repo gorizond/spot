@@ -5,17 +5,17 @@ on:
     branches: [ main ]
     paths:
       - 'spot_lcd_cpp/**'
-      - 'docker/lcd/Dockerfile.cpp'
+      - 'docker/lcd/Dockerfile.min'
       - '.github/workflows/lcd-image.yml'
   pull_request:
     branches: [ main ]
     paths:
       - 'spot_lcd_cpp/**'
-      - 'docker/lcd/Dockerfile.cpp'
+      - 'docker/lcd/Dockerfile.min'
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: gorizond/spot-lcd-cpp
+  IMAGE_NAME: gorizond/spot-lcd-min
 
 jobs:
   build-and-push:
@@ -52,20 +52,12 @@ jobs:
             type=ref,event=pr
             type=sha,prefix=
 
-<<<<<<< HEAD
-      - name: Build and push Docker image (C++ version)
-=======
-      - name: Build and push Docker image (ARM64 cross-compilation)
->>>>>>> origin/main
+      - name: Build and push Docker image (minimal version)
         id: push
         uses: docker/build-push-action@v5
         with:
           context: .
-<<<<<<< HEAD
-          file: ./docker/lcd/Dockerfile.cpp
-=======
-          file: ./docker/lcd/Dockerfile.arm64
->>>>>>> origin/main
+          file: ./docker/lcd/Dockerfile.min
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
