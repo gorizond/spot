@@ -13,9 +13,9 @@ RUN set -eux; \
 WORKDIR /app
 
 # Копируем файлы для сборки
-COPY spot_lcd_node/Cargo.toml .
-COPY spot_lcd_node/Cargo.lock .
-COPY spot_lcd_node/src src
+COPY ./spot_lcd_node/Cargo.toml ./Cargo.toml
+COPY ./spot_lcd_node/Cargo.lock ./Cargo.lock
+COPY ./spot_lcd_node/src ./src
 
 # Устанавливаем аргумент FEATURES с значением по умолчанию
 ARG FEATURES=standalone
@@ -46,7 +46,7 @@ RUN useradd --create-home --shell /bin/bash app
 WORKDIR /app
 
 # Копируем конфигурацию
-COPY spot_lcd_node/config /app/config
+COPY ./spot_lcd_node/config /app/config
 
 # Меняем владельца файлов
 RUN chown -R app:app /app
