@@ -3,10 +3,8 @@ FROM rust:1.70-bookworm AS builder
 
 SHELL ["/bin/bash", "-c"]
 
-# Устанавливаем Rust
+# Устанавливаем Rust (уже установлен в базовом образе, просто устанавливаем нужную версию)
 RUN set -eux; \
-    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y; \
-    source ~/.cargo/env; \
     rustup default stable
 
 # Устанавливаем зависимости для rppal и ROS2
