@@ -88,6 +88,7 @@ public:
     
     void startDisplayLoop();
     std::shared_ptr<std::mutex> getLcdReference();
+    void setData(const std::string& key, const std::string& value);
     
 private:
     std::shared_ptr<std::mutex> data_mutex_;

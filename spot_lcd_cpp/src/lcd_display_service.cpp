@@ -21,6 +21,7 @@ DisplayService::~DisplayService() {
 void DisplayService::startDisplayLoop() {
     running_ = true;
     display_thread_ = std::thread([this]() {
+        int counter = 0;
         while (running_) {
             std::this_thread::sleep_for(std::chrono::seconds(1));
             
@@ -32,10 +33,22 @@ void DisplayService::startDisplayLoop() {
             std::string uptime = uptime_it != data_.end() ? uptime_it->second : "N/A";
             
             std::cout << "LCD Display - Temp: " << temp << ", Uptime: " << uptime << std::endl;
+            
+            // Обновляем LCD дисплей каждые 2 секунды
+            if (lcd_display_ && ++counter % 2 == 0) {
+                lcd_display_->clear();
+                lcd_display_->writeLine(0, "Temp: " + temp);
+                lcd_display_->writeLine(1, "Up: " + uptime);
+            }
         }
     });
 }
 
 std::shared_ptr<std::mutex> DisplayService::getLcdReference() {
     return data_mutex_;
+}
+
+void DisplayService::setData(const std::string& key, const std::string& value) {
+    std::lock_guard<std::mutex> lock(*data_mutex_);
+    data_[key] = value;
 }

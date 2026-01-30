@@ -44,7 +44,7 @@ spec:
         gorizond.io/spot-lcd: "true"
       containers:
         - name: lcd-display
-          image: ghcr.io/gorizond/spot-lcd-min:latest
+          image: ghcr.io/gorizond/spot-lcd-cpp:latest
           imagePullPolicy: Always
           command:
           - /usr/local/bin/spot_lcd_node

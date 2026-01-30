@@ -181,8 +181,7 @@ int main(int argc, char *argv[]) {
     if (run_temp) {
         auto temp_callback = [display_service](const std::string& temp) {
             if (display_service) {
-                auto mutex_ptr = display_service->getLcdReference();
-                std::lock_guard<std::mutex> lock(*mutex_ptr);
+                display_service->setData("temperature", temp);
                 std::cout << "Temperature: " << temp << std::endl;
             } else {
                 std::cout << "Temperature: " << temp << std::endl;
@@ -196,8 +195,7 @@ int main(int argc, char *argv[]) {
     if (run_uptime) {
         auto uptime_callback = [display_service](const std::string& uptime) {
             if (display_service) {
-                auto mutex_ptr = display_service->getLcdReference();
-                std::lock_guard<std::mutex> lock(*mutex_ptr);
+                display_service->setData("uptime", uptime);
                 std::cout << "Uptime: " << uptime << std::endl;
             } else {
                 std::cout << "Uptime: " << uptime << std::endl;

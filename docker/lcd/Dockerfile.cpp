@@ -1,41 +1,42 @@
 # Stage 1: Build stage
-FROM ubuntu:22.04 AS builder
+FROM ubuntu:24.04 AS builder
 
-# Устанавливаем необходимые пакеты для сборки
+# Устанавливаем зависимости для сборки
 RUN apt-get update && apt-get install -y \
     build-essential \
     cmake \
     git \
+    pkg-config \
+    libwiringpi-dev \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
 # Копируем исходный код
-COPY ./spot_lcd_cpp/ ./
+COPY ../../../spot_lcd_cpp /app/src
 
-# Создаем build директорию и собираем проект
-RUN mkdir -p build && cd build && \
-    cmake .. -DCMAKE_BUILD_TYPE=Release -DENABLE_GPIO=OFF && \
-    make -j$(nproc)
+# Создаем директорию для сборки
+WORKDIR /app/build
+
+# Конфигурируем и собираем проект
+RUN cmake /app/src -DENABLE_GPIO=ON -DCMAKE_BUILD_TYPE=Release && \
+    make -j$(nproc) && \
+    make install
 
 # Stage 2: Runtime stage
-FROM ubuntu:22.04
+FROM ubuntu:24.04
+
+# Устанавливаем минимальные зависимости для работы
+RUN apt-get update && apt-get install -y \
+    libwiringpi3 \
+    && rm -rf /var/lib/apt/lists/*
 
 # Копируем исполняемый файл из стадии сборки
-COPY --from=builder /app/build/spot_lcd_node /usr/local/bin/
-
-# Создаем пользователя
-RUN useradd --create-home --shell /bin/bash app
+COPY --from=builder /usr/local/bin/spot_lcd_node /usr/local/bin/
+COPY --from=builder /app/src/config /app/config
 
 # Устанавливаем рабочую директорию
 WORKDIR /app
 
-# Копируем конфигурацию
-COPY ./spot_lcd_cpp/config /app/config
-
-# Меняем владельца файлов
-RUN chown -R app:app /app
-USER app
-
 # Точка входа
-ENTRYPOINT ["/usr/local/bin/spot_lcd_node"]
+ENTRYPOINT ["/usr/local/bin/spot_lcd_node", "-m", "all"]
