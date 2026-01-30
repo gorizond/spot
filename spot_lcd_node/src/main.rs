@@ -31,6 +31,8 @@ struct Args {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    env_logger::init(); // Initialize logger
+    
     let args = Args::parse();
     
     println!("Starting LCD service modules: {}", args.module);

@@ -15,7 +15,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: gorizond/spot-lcd
+  IMAGE_NAME: gorizond/spot-lcd-rust-rust
 
 jobs:
   build-and-push:
@@ -23,7 +23,6 @@ jobs:
     permissions:
       contents: read
       packages: write
-      attestations: write
       id-token: write
 
     steps:
@@ -46,88 +45,12 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
             type=ref,event=branch
             type=ref,event=pr
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
             type=sha,prefix=
 
-      # Подготовка проекта для сборки без ROS2 зависимостей
-      - name: Prepare project for build without ROS2 dependencies
-        run: |
-          # Создаем упрощенную версию Cargo.toml без ROS2 зависимостей
-          cat > spot_lcd_node/Cargo.toml << 'EOF'
-          [package]
-          name = "spot_lcd_node"
-          version = "0.1.0"
-          edition = "2021"
-
-          [[bin]]
-          name = "spot_lcd_node"
-          path = "src/main.rs"
-
-          [dependencies]
-          tokio = { version = "1.0", features = ["full"] }
-          anyhow = "1.0"
-          log = "0.4"
-          env_logger = "0.10"
-          toml = "0.8"
-          serde = { version = "1.0", features = ["derive"] }
-          clap = { version = "4.0", features = ["derive"] }
-
-          [target.'cfg(target_os = "linux")'.dependencies]
-          rppal = { version = "0.11", features = ["hal"] }
-
-          [features]
-          default = []
-          standalone = []
-          EOF
-          
-          # Обновляем main.rs, чтобы убрать зависимости от ros_publisher
-          sed -i 's/^[[:space:]]*use ros_publisher::RosPublisher;/\/\/&/' spot_lcd_node/src/main.rs
-          sed -i 's/^[[:space:]]*mod ros_publisher;/\/\/&/' spot_lcd_node/src/main.rs
-          sed -i 's/^[[:space:]]*ros_publisher/dummy_publisher/' spot_lcd_node/src/main.rs
-          sed -i 's/^[[:space:]]*RosPublisher/DummyPublisher/' spot_lcd_node/src/main.rs
-          
-          # Если есть ros_publisher модуль, временно заменяем на заглушку
-          if [ -f "spot_lcd_node/src/ros_publisher/mod.rs" ]; then
-            rm -rf spot_lcd_node/src/ros_publisher
-            mkdir -p spot_lcd_node/src/ros_publisher
-            cat > spot_lcd_node/src/ros_publisher/mod.rs << 'MOD_EOF'
-          use anyhow::Result;
-          use std::sync::Arc;
-          use std::sync::Mutex;
-
-          pub struct DummyPublisher {
-              temp_publisher: Arc<Mutex<Option<String>>>,
-              uptime_publisher: Arc<Mutex<Option<String>>>,
-          }
-
-          impl DummyPublisher {
-              pub fn new() -> Result<Self> {
-                  println!("Creating dummy publisher (ROS2 disabled)");
-                  Ok(DummyPublisher {
-                      temp_publisher: Arc::new(Mutex::new(None)),
-                      uptime_publisher: Arc::new(Mutex::new(None)),
-                  })
-              }
-
-              pub fn publish_temperature(&self, temp: &str) {
-                  println!("Temperature published: {}", temp);
-              }
-
-              pub fn publish_uptime(&self, uptime: &str) {
-                  println!("Uptime published: {}", uptime);
-              }
-
-              pub fn start_ros_bridge(&self) {
-                  println!("Dummy ROS bridge started");
-              }
-          }
-          MOD_EOF
-          fi
-
-      - name: Build and push Docker image
+      - name: Build and push Docker image (standalone version)
         id: push
         uses: docker/build-push-action@v5
         with:
@@ -138,5 +61,5 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
-      # Убираем attest-build, так как он не существует
+          build-args: |
+            FEATURES=standalone
