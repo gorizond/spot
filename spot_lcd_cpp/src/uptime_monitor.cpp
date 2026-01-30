@@ -3,8 +3,11 @@
 #include <sstream>
 #include <cmath>
 #include <chrono>
+
+#ifdef __APPLE__
 #include <sys/sysctl.h>
 #include <time.h>
+#endif
 
 UptimeMonitor::UptimeMonitor(Callback callback, const UptimeMonitorConfig& config) 
     : callback_(callback), config_(config) {}
@@ -47,6 +50,7 @@ std::string UptimeMonitor::getSystemUptime() {
         
         return oss.str();
     }
+#ifdef __APPLE__
     // Для macOS используем sysctl
     else {
         struct timeval boottime;
@@ -74,6 +78,7 @@ std::string UptimeMonitor::getSystemUptime() {
             return oss.str();
         }
     }
+#endif
     
     // Значение по умолчанию
     return "0m";
