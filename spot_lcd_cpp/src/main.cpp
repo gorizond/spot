@@ -13,23 +13,39 @@
 class SpotLcdNode : public rclcpp::Node {
 public:
     SpotLcdNode() : Node("spot_lcd_node") {
-        // Подписка на темпы температуры
+        // Инициализация дисплея
+        config_ = Config::fromEnv();
+        display_service_ = std::make_unique<DisplayService>(config_.lcd);
+        
+        // Запускаем обычные мониторы как fallback
+        auto temp_callback = [this](const std::string& temp) {
+            ProcessTemperatureData(temp);
+        };
+        
+        auto uptime_callback = [this](const std::string& uptime) {
+            ProcessUptimeData(uptime);
+        };
+        
+        temp_monitor_ = std::make_unique<TempMonitor>(temp_callback, config_.temp_monitor);
+        uptime_monitor_ = std::make_unique<UptimeMonitor>(uptime_callback, config_.uptime_monitor);
+        
+        // Подписка на темпы температуры (если доступны)
         temp_subscription_ = this->create_subscription<std_msgs::msg::String>(
             "/system/temperature", 10,
             [this](const std_msgs::msg::String::SharedPtr msg) {
                 ProcessTemperatureData(msg->data);
             });
 
-        // Подписка на темпы аптайма
+        // Подписка на темпы аптайма (если доступны)
         uptime_subscription_ = this->create_subscription<std_msgs::msg::String>(
             "/system/uptime", 10,
             [this](const std_msgs::msg::String::SharedPtr msg) {
                 ProcessUptimeData(msg->data);
             });
 
-        // Инициализация дисплея
-        config_ = Config::fromEnv();
-        display_service_ = std::make_unique<DisplayService>(config_.lcd);
+        // Запускаем мониторы
+        temp_monitor_->startMonitoring();
+        uptime_monitor_->startMonitoring();
         
         // Таймер для обновления дисплея
         display_timer_ = this->create_wall_timer(
@@ -69,6 +85,8 @@ private:
     rclcpp::TimerBase::SharedPtr display_timer_;
     Config config_;
     std::unique_ptr<DisplayService> display_service_;
+    std::unique_ptr<TempMonitor> temp_monitor_;
+    std::unique_ptr<UptimeMonitor> uptime_monitor_;
     std::map<std::string, std::string> data_map_;
 };
 #endif
