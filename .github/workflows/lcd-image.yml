@@ -49,7 +49,6 @@ jobs:
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=ref,event=branch
-            type=ref=event=pr
             type=sha,prefix=
 
       - name: Build and push Docker image (C++ version)
