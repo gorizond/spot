@@ -23,14 +23,7 @@ RUN cmake /app/src -DENABLE_GPIO=ON -DCMAKE_BUILD_TYPE=Release && \
     make -j$(nproc)
 
 # Stage 2: Runtime stage
-FROM ubuntu:22.04
-
-# Устанавливаем зависимости для работы
-RUN apt-get update && apt-get install -y \
-    libstdc++6 \
-    libgcc-s1 \
-    wiringpi \
-    && rm -rf /var/lib/apt/lists/*
+FROM gcr.io/distroless/cc-debian11 AS runtime
 
 # Копируем исполняемый файл из стадии сборки
 COPY --from=builder /app/build/spot_lcd_node /usr/local/bin/
