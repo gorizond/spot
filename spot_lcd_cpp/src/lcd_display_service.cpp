@@ -3,10 +3,8 @@
 DisplayService::DisplayService(const LcdConfig& config) : config_(config) {
     data_mutex_ = std::make_shared<std::mutex>();
     
-#ifndef USE_GPIO
     lcd_display_ = std::make_unique<LcdDisplay>(config_);
     lcd_display_->initialize();
-#endif
 }
 
 DisplayService::~DisplayService() {
@@ -21,7 +19,6 @@ DisplayService::~DisplayService() {
 void DisplayService::startDisplayLoop() {
     running_ = true;
     display_thread_ = std::thread([this]() {
-        int counter = 0;
         while (running_) {
             std::this_thread::sleep_for(std::chrono::seconds(1));
             
@@ -34,8 +31,8 @@ void DisplayService::startDisplayLoop() {
             
             std::cout << "LCD Display - Temp: " << temp << ", Uptime: " << uptime << std::endl;
             
-            // Обновляем LCD дисплей каждые 2 секунды
-            if (lcd_display_ && ++counter % 2 == 0) {
+            // Обновляем LCD дисплей каждую секунду
+            if (lcd_display_) {
                 lcd_display_->clear();
                 lcd_display_->writeLine(0, "Temp: " + temp);
                 lcd_display_->writeLine(1, "Up: " + uptime);
