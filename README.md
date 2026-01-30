@@ -317,3 +317,4 @@ ros2 topic echo /spot/state/mux --once
 
 For manual control (via mux), publish to `/spot/cmd/servo_manual` (default in `spot_cli.py`).
 For convenience inside the pod, use `python3 /opt/spot/spot_cli.py ...`.
+# Update Fri Jan 30 16:58:14 +05 2026
