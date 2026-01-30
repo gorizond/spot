@@ -13,9 +13,9 @@ RUN set -eux; \
 WORKDIR /app
 
 # Копируем специальный Cargo.toml для standalone версии и исходники
-COPY ./spot_lcd_node/Cargo.standalone.toml ./Cargo.toml
-COPY ./spot_lcd_node/Cargo.lock ./Cargo.lock
-COPY ./spot_lcd_node/src ./src
+COPY ./spot_lcd_node/standalone/Cargo.toml ./Cargo.toml
+COPY ./spot_lcd_node/standalone/Cargo.lock ./Cargo.lock
+COPY ./spot_lcd_node/standalone/src ./src
 
 # Собираем standalone версию
 RUN cargo build --release --features standalone
