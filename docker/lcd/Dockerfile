@@ -7,16 +7,13 @@ SHELL ["/bin/bash", "-c"]
 RUN set -eux; \
     rustup default stable
 
-# Устанавливаем зависимости для rppal и ROS2
+# Устанавливаем зависимости для rppal
 RUN set -eux; \
     apt-get update; \
     apt-get install -y --no-install-recommends \
       build-essential \
       libudev-dev \
-      libsystemd-dev \
-      libclang-dev \
       pkg-config \
-      cmake \
       git \
     ; \
     rm -rf /var/lib/apt/lists/*
@@ -27,14 +24,30 @@ WORKDIR /build
 
 # Копируем зависимости
 COPY spot_lcd_node/Cargo.toml spot_lcd_node/Cargo.lock ./
+# Удаляем ROS2 зависимости из Cargo.toml перед сборкой
+RUN sed -i '/rclrs/d; /rosidl/d; /std-msgs/d' Cargo.toml
+
 RUN mkdir src && echo "fn main() {}" > src/main.rs
-RUN cargo build --release --features standalone
+RUN cargo build --release --locked
 RUN rm src/main.rs
 
 # Копируем исходники и собираем
 COPY spot_lcd_node/src ./src
-RUN touch src/main.rs
-RUN cargo build --release --features standalone
+# Удаляем или комментируем импорты ROS2 из main.rs
+RUN sed -i 's/^mod ros_publisher;/\/\/mod ros_publisher;/g' src/main.rs
+RUN sed -i 's/^use ros_publisher::RosPublisher;/\/\/use ros_publisher::RosPublisher;/g' src/main.rs
+RUN sed -i 's/ros_publisher::RosPublisher/DummyPublisher/g' src/main.rs
+RUN sed -i 's/let ros_publisher = Arc::new(RosPublisher::new()?)?;/let ros_publisher = Arc::new(DummyPublisher::new()?);/g' src/main.rs || true
+RUN sed -i 's/let ros_publisher = Some(RosPublisher::new()?)?;/let ros_publisher = Some(DummyPublisher::new()?);/g' src/main.rs || true
+RUN sed -i 's/ros_publisher.as_ref().unwrap().start_ros_bridge();//g' src/main.rs || true
+RUN sed -i 's/ros_publisher_temp.publish_temperature(temp);//g' src/main.rs || true
+RUN sed -i 's/ros_publisher_uptime.publish_uptime(uptime);//g' src/main.rs || true
+
+# Создаем заглушку для RosPublisher
+RUN mkdir -p src/ros_publisher
+RUN echo '#[derive(Debug)]\n pub struct DummyPublisher;\n\n impl DummyPublisher {\n     pub fn new() -> Result<Self, anyhow::Error> {\n         Ok(DummyPublisher)\n     }\n\n     pub fn publish_temperature(&self, temp: &str) {\n         println!("Temperature: {}", temp);\n     }\n\n     pub fn publish_uptime(&self, uptime: &str) {\n         println!("Uptime: {}", uptime);\n     }\n\n     pub fn start_ros_bridge(&self) {\n         println!("Dummy publisher started");\n     }\n }' > src/ros_publisher/mod.rs
+
+RUN cargo build --release --locked
 
 # Stage 2: Runtime stage
 FROM debian:bookworm-slim
