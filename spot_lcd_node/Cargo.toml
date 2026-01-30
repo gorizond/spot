@@ -27,4 +27,4 @@ rppal = { version = "0.11", features = ["hal"] }
 [features]
 default = ["standalone"]
 standalone = []
-ros2 = ["dep:rclrs", "dep:rosidl-typesupport-common", "dep:std-msgs"]
+# ros2 = ["dep:rclrs", "dep:rosidl-typesupport-common", "dep:std-msgs"]
