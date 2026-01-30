@@ -3,6 +3,9 @@ mod lcd_core;
 mod lcd_display_service;
 mod temp_monitor;
 mod uptime_monitor;
+
+// Only include ros_publisher when ros2 feature is enabled
+#[cfg(feature = "ros2")]
 mod ros_publisher;
 
 use anyhow::Result;
@@ -11,7 +14,6 @@ use lcd_core::LcdDisplay;
 use lcd_display_service::DisplayService;
 #[cfg(target_os = "linux")]
 use rppal::gpio::Gpio;
-use ros_publisher::RosPublisher;
 use std::sync::{Arc, Mutex};
 use temp_monitor::TempMonitor;
 use std::collections::HashMap;
@@ -66,17 +68,6 @@ async fn main() -> Result<()> {
     
     // Initialize shared resources based on required modules
     let mut display_service: Option<DisplayService> = None;
-    let mut ros_publisher: Option<RosPublisher> = None;
-    
-    // Initialize ROS publisher if needed
-    let ros_publisher_needed = run_all || 
-                              modules.contains(&"temp") || 
-                              modules.contains(&"uptime");
-    
-    if ros_publisher_needed {
-        ros_publisher = Some(RosPublisher::new()?);
-        ros_publisher.as_ref().unwrap().start_ros_bridge();
-    }
     
     // Initialize LCD and display service if needed
     if run_all || modules.contains(&"lcd") {
@@ -118,20 +109,30 @@ async fn main() -> Result<()> {
             Arc::new(Arc::new(Mutex::new(HashMap::<String, String>::new())))
         };
         
-        let ros_publisher_temp = if let Some(ref ros_pub) = ros_publisher {
-            Arc::new(ros_pub)
-        } else {
-            Arc::new(RosPublisher::new()?)
-        };
-        
+        #[cfg(feature = "ros2")]
         let temp_callback = {
+            use ros_publisher::RosPublisher;
+            let ros_publisher = Arc::new(RosPublisher::new()?);
+            ros_publisher.start_ros_bridge();
+            
             let display_service_temp = Arc::clone(&display_service_temp);
-            let ros_publisher_temp = Arc::clone(&ros_publisher_temp);
+            let ros_publisher_temp = Arc::clone(&ros_publisher);
             
             Arc::new(move |temp: &str| {
                 let mut data = display_service_temp.lock().unwrap();
                 data.insert("temperature".to_string(), temp.to_string());
                 ros_publisher_temp.publish_temperature(temp);
+            })
+        };
+        
+        #[cfg(not(feature = "ros2"))]
+        let temp_callback = {
+            let display_service_temp = Arc::clone(&display_service_temp);
+            
+            Arc::new(move |temp: &str| {
+                let mut data = display_service_temp.lock().unwrap();
+                data.insert("temperature".to_string(), temp.to_string());
+                println!("Temperature: {}", temp);
             })
         };
         
@@ -147,20 +148,30 @@ async fn main() -> Result<()> {
             Arc::new(Arc::new(Mutex::new(HashMap::<String, String>::new())))
         };
         
-        let ros_publisher_uptime = if let Some(ref ros_pub) = ros_publisher {
-            Arc::new(ros_pub)
-        } else {
-            Arc::new(RosPublisher::new()?)
-        };
-        
+        #[cfg(feature = "ros2")]
         let uptime_callback = {
+            use ros_publisher::RosPublisher;
+            let ros_publisher = Arc::new(RosPublisher::new()?);
+            ros_publisher.start_ros_bridge();
+            
             let display_service_uptime = Arc::clone(&display_service_uptime);
-            let ros_publisher_uptime = Arc::clone(&ros_publisher_uptime);
+            let ros_publisher_uptime = Arc::clone(&ros_publisher);
             
             Arc::new(move |uptime: &str| {
                 let mut data = display_service_uptime.lock().unwrap();
                 data.insert("uptime".to_string(), uptime.to_string());
                 ros_publisher_uptime.publish_uptime(uptime);
+            })
+        };
+        
+        #[cfg(not(feature = "ros2"))]
+        let uptime_callback = {
+            let display_service_uptime = Arc::clone(&display_service_uptime);
+            
+            Arc::new(move |uptime: &str| {
+                let mut data = display_service_uptime.lock().unwrap();
+                data.insert("uptime".to_string(), uptime.to_string());
+                println!("Uptime: {}", uptime);
             })
         };
         

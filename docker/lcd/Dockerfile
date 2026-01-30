@@ -28,13 +28,13 @@ WORKDIR /build
 # Копируем зависимости
 COPY spot_lcd_node/Cargo.toml spot_lcd_node/Cargo.lock ./
 RUN mkdir src && echo "fn main() {}" > src/main.rs
-RUN cargo build --release
+RUN cargo build --release --no-default-features
 RUN rm src/main.rs
 
 # Копируем исходники и собираем
 COPY spot_lcd_node/src ./src
 RUN touch src/main.rs
-RUN cargo build --release
+RUN cargo build --release --no-default-features
 
 # Stage 2: Runtime stage
 FROM debian:bookworm-slim
