@@ -1,5 +1,5 @@
 # Stage 1: Build stage
-FROM ubuntu:24.04 AS builder
+FROM ubuntu:22.04 AS builder
 
 # Устанавливаем зависимости для сборки
 RUN apt-get update && apt-get install -y \
@@ -24,7 +24,7 @@ RUN cmake /app/src -DENABLE_GPIO=ON -DCMAKE_BUILD_TYPE=Release && \
     make install
 
 # Stage 2: Runtime stage
-FROM ubuntu:24.04
+FROM ubuntu:22.04
 
 # Устанавливаем зависимости для работы
 RUN apt-get update && apt-get install -y \
