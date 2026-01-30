@@ -5,11 +5,10 @@
 #include <thread>
 #include <chrono>
 #include <sstream>
-
-#ifdef USE_ROS2
 #include "rclcpp/rclcpp.hpp"
 #include "std_msgs/msg/string.hpp"
 
+#ifdef USE_ROS2
 class SpotLcdNode : public rclcpp::Node {
 public:
     SpotLcdNode() : Node("spot_lcd_node") {
@@ -36,6 +35,7 @@ public:
             std::chrono::seconds(1),
             [this]() {
                 // Обновляем дисплей с текущими данными
+                // Получаем текущие данные и обновляем дисплей
                 std::lock_guard<std::mutex> lock(*(display_service_->getLcdReference()));
                 
                 auto temp_it = data_map_.find("temperature");
