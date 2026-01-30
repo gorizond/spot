@@ -12,9 +12,8 @@ RUN set -eux; \
 
 WORKDIR /app
 
-# Создаем упрощенную версию Cargo.toml без ROS2 зависимостей
-RUN mkdir -p spot_lcd_node/src
-COPY ./spot_lcd_node/Cargo.toml ./
+# Копируем специальный Cargo.toml для standalone версии
+COPY ./spot_lcd_node/Cargo.standalone.toml ./Cargo.toml
 COPY ./spot_lcd_node/src ./src
 
 # Устанавливаем аргумент FEATURES с значением по умолчанию
