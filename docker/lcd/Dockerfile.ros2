@@ -16,8 +16,11 @@ WORKDIR /ws
 # Копируем исходный код
 COPY ../../../spot_lcd_cpp /ws/src/spot_lcd_cpp
 
-# Сборка ROS2 пакета
-RUN colcon build --packages-select spot_lcd_cpp
+# Сборка ROS2 пакета с включенным GPIO
+RUN cd /ws/src/spot_lcd_cpp && \
+    sed -i 's/option(ENABLE_GPIO "Enable GPIO support for LCD" OFF)/option(ENABLE_GPIO "Enable GPIO support for LCD" ON)/' CMakeLists.txt && \
+    cd /ws && \
+    colcon build --packages-select spot_lcd_cpp
 
 # Stage 2: Runtime stage
 FROM osrf/ros:humble-ros-base AS runtime

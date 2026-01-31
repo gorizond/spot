@@ -7,6 +7,7 @@ RUN apt-get update && apt-get install -y \
     cmake \
     git \
     pkg-config \
+    wiringpi \
     libwiringpi-dev \
     && rm -rf /var/lib/apt/lists/*
 
@@ -18,8 +19,8 @@ COPY ../../../spot_lcd_cpp /app/src
 # Создаем директорию для сборки
 WORKDIR /app/build
 
-# Конфигурируем и собираем проект (GPIO отключен для совместимости)
-RUN cmake /app/src -DENABLE_GPIO=OFF -DENABLE_ROS2=OFF -DCMAKE_BUILD_TYPE=Release && \
+# Конфигурируем и собираем проект (GPIO включен)
+RUN cmake /app/src -DENABLE_GPIO=ON -DENABLE_ROS2=OFF -DCMAKE_BUILD_TYPE=Release && \
     make -j$(nproc)
 
 # Stage 2: Runtime stage

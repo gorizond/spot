@@ -9,7 +9,7 @@ set(CMAKE_CXX_STANDARD 17)
 
 # Options for features
 option(ENABLE_ROS2 "Enable ROS2 integration" OFF)
-option(ENABLE_GPIO "Enable GPIO support for LCD" OFF)
+option(ENABLE_GPIO "Enable GPIO support for LCD" ON)
 
 # Include directories
 include_directories(include)

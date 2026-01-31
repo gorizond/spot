@@ -74,6 +74,7 @@ public:
 private:
     LcdConfig config_;
     bool initialized_ = false;
+    bool setCursorPosition(uint8_t row, uint8_t col);
     
 #ifdef USE_GPIO
     void pulseEnable();
