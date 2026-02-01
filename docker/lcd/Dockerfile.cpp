@@ -32,6 +32,8 @@ RUN apt-get update && apt-get install -y \
     libgcc-s1 \
     && rm -rf /var/lib/apt/lists/*
 
+# Обновлено для запуска GitHub Actions
+
 # Копируем исполняемый файл из стадии сборки
 COPY --from=builder /app/build/spot_lcd_cpp_node /usr/local/bin/
 COPY --from=builder /app/src/config /app/config
