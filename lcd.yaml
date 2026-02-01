@@ -116,10 +116,28 @@ spec:
           image: ghcr.io/gorizond/spot-lcd-cpp:latest
           imagePullPolicy: Always
           command:
-          - /usr/local/bin/spot_lcd_cpp_node
-          args:
-          - -m
-          - all
+          - /bin/sh
+          - -c
+          - |
+            # Create symlinks to device info files in expected locations
+            if [ -f /tmp/device-info/linux,revision ]; then
+              mkdir -p /proc/device-tree/system
+              ln -sf /tmp/device-info/linux,revision /proc/device-tree/system/linux,revision
+            elif [ -f /tmp/device-info/revision ]; then
+              mkdir -p /proc/device-tree
+              ln -sf /tmp/device-info/revision /proc/device-tree/revision
+            fi
+            
+            # Create cpuinfo symlink if needed
+            if [ -f /tmp/device-info/cpuinfo ]; then
+              ln -sf /tmp/device-info/cpuinfo /tmp/cpuinfo_for_wiringpi
+            fi
+            
+            # Set environment variable to potentially help with detection
+            export WIRINGPI_GPIOMEM=1
+            
+            # Run the actual application
+            exec /usr/local/bin/spot_lcd_cpp_node -m all
           securityContext:
             privileged: true
             runAsUser: 0
