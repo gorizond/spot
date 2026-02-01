@@ -42,6 +42,77 @@ spec:
         kubernetes.io/arch: arm64
         gorizond.io/robot: "true"
         gorizond.io/spot-lcd: "true"
+      initContainers:
+        - name: device-info-check
+          image: ubuntu:24.04
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -ex
+              
+              # Install required tools
+              apt-get update && apt-get install -y wget unzip bc
+                
+              # Check if device tree revision file exists and copy it
+              if [ -f /host/proc/device-tree/system/linux,revision ]; then
+                cp /host/proc/device-tree/system/linux,revision /device-info/
+                echo "Found linux,revision file"
+              elif [ -f /host/proc/device-tree/system/linux,Revision ]; then
+                cp /host/proc/device-tree/system/linux,Revision /device-info/
+                echo "Found linux,Revision file"
+              else
+                echo "Warning: Could not find system revision file"
+                
+                # Try alternative locations
+                if [ -f /host/proc/device-tree/revision ]; then
+                  cp /host/proc/device-tree/revision /device-info/
+                  echo "Found revision file at /device-tree/revision"
+                elif [ -f /host/proc/device-tree/soc/ranges ]; then
+                  cp /host/proc/device-tree/soc/ranges /device-info/ 2>/dev/null || echo "Could not copy ranges file"
+                fi
+              fi
+              
+              # Copy cpuinfo and check for Hardware line
+              if [ -f /host/proc/cpuinfo ]; then
+                cp /host/proc/cpuinfo /device-info/
+                if grep -q "Hardware" /host/proc/cpuinfo; then
+                  echo "Found Hardware line in cpuinfo"
+                else
+                  echo "No Hardware line found in cpuinfo, creating fallback"
+                  echo "Hardware : BCM2835" > /device-info/hardware_fallback
+                fi
+              fi
+              
+              # Create additional files that might be needed by wiringPi
+              if [ -f /host/proc/device-tree/model ]; then
+                cp /host/proc/device-tree/model /device-info/
+              fi
+              
+              # Check for serial number
+              if [ -f /host/proc/device-tree/serial-number ]; then
+                cp /host/proc/device-tree/serial-number /device-info/
+              fi
+              
+              # List all files in device-info for debugging
+              ls -la /device-info/
+          securityContext:
+            privileged: false
+            runAsUser: 0
+            runAsGroup: 0
+          volumeMounts:
+            - name: host-proc
+              mountPath: /host/proc
+              readOnly: true
+            - name: device-info-volume
+              mountPath: /device-info
+          resources:
+            limits:
+              cpu: 100m
+              memory: 64Mi
+            requests:
+              cpu: 10m
+              memory: 32Mi
       containers:
         - name: lcd-display
           image: ghcr.io/gorizond/spot-lcd-cpp:latest
@@ -74,6 +145,8 @@ spec:
             - name: host-cpuinfo
               mountPath: /proc/cpuinfo
               readOnly: true
+            - name: device-info-volume
+              mountPath: /tmp/device-info
             - name: gpiomem
               mountPath: /dev/gpiomem
       volumes:
@@ -96,6 +169,8 @@ spec:
           hostPath:
             path: /proc/cpuinfo
             type: File
+        - name: device-info-volume
+          emptyDir: {}
         - name: gpiomem
           hostPath:
             path: /dev/gpiomem
