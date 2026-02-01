@@ -119,22 +119,38 @@ spec:
           - /bin/sh
           - -c
           - |
-            # Create symlinks to device info files in expected locations
+            # Create a temporary directory structure to overlay device tree info
+            mkdir -p /tmp/device-overlay/proc/device-tree/system
+            mkdir -p /tmp/device-overlay/proc
+            
+            # Copy the files from our init-container to the overlay
             if [ -f /tmp/device-info/linux,revision ]; then
-              mkdir -p /proc/device-tree/system
-              ln -sf /tmp/device-info/linux,revision /proc/device-tree/system/linux,revision
+              cp /tmp/device-info/linux,revision /tmp/device-overlay/proc/device-tree/system/
             elif [ -f /tmp/device-info/revision ]; then
-              mkdir -p /proc/device-tree
-              ln -sf /tmp/device-info/revision /proc/device-tree/revision
+              cp /tmp/device-info/revision /tmp/device-overlay/proc/device-tree/
             fi
             
-            # Create cpuinfo symlink if needed
+            # Copy cpuinfo if available
             if [ -f /tmp/device-info/cpuinfo ]; then
-              ln -sf /tmp/device-info/cpuinfo /tmp/cpuinfo_for_wiringpi
+              cp /tmp/device-info/cpuinfo /tmp/device-overlay/proc/cpuinfo
+            elif [ -f /tmp/device-info/hardware_fallback ]; then
+              # Create a cpuinfo with fallback hardware info
+              echo "" > /tmp/device-overlay/proc/cpuinfo
+              cat /tmp/device-info/hardware_fallback >> /tmp/device-overlay/proc/cpuinfo
             fi
             
-            # Set environment variable to potentially help with detection
+            # Create model file if available
+            if [ -f /tmp/device-info/model ]; then
+              cp /tmp/device-info/model /tmp/device-overlay/proc/device-tree/
+            fi
+            
+            # Use mount to overlay our device info over the original paths
+            mount --bind /tmp/device-overlay/proc/device-tree /proc/device-tree 2>/dev/null || true
+            mount --bind /tmp/device-overlay/proc/cpuinfo /proc/cpuinfo 2>/dev/null || true
+            
+            # Alternative approach: try to trick wiringPi with environment variables
             export WIRINGPI_GPIOMEM=1
+            export BCM2835_NO_ERROR=1
             
             # Run the actual application
             exec /usr/local/bin/spot_lcd_cpp_node -m all
