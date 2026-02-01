@@ -47,7 +47,7 @@ spec:
           image: ghcr.io/gorizond/spot-lcd-cpp:latest
           imagePullPolicy: Always
           command:
-          - /usr/local/bin/spot_lcd_node
+          - /usr/local/bin/spot_lcd_cpp_node
           args:
           - -m
           - all
