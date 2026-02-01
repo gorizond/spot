@@ -30,6 +30,8 @@ FROM ubuntu:22.04 AS runtime
 RUN apt-get update && apt-get install -y \
     libstdc++6 \
     libgcc-s1 \
+    wiringpi \
+    libwiringpi-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Обновлено для запуска GitHub Actions
