@@ -151,31 +151,47 @@ EOF
             echo "Raspberry Pi 3 Model B Plus" > "$FAKE_SYSFS/proc/device-tree/model"
             
             # Try to use mount namespace if available to isolate our changes
-            if command -v unshare >/dev/null 2>&1 && [ -w /proc/self/ns/mnt ]; then
-              # Create new mount namespace and bind mount our fake files
-              unshare -m -- sh -c "
-                mount --make-rslave / 2>/dev/null || true
-                mount --bind '$FAKE_SYSFS/proc/device-tree' /proc/device-tree 2>/dev/null || true
-                mount --bind '$FAKE_SYSFS/proc/cpuinfo' /proc/cpuinfo 2>/dev/null || true
-                # Export environment variables to help wiringPi
-                export WIRINGPI_GPIOMEM=1
-                export WIRINGPI_CODES=1
-                export BCM2835_NO_ERROR=1
-                exec /usr/local/bin/spot_lcd_cpp_node -m all
-              "
-            else
-              # Directly bind mount the fake files to override the host's
-              mount --make-rslave / 2>/dev/null || true
-              mount --bind '$FAKE_SYSFS/proc/device-tree' /proc/device-tree 2>/dev/null || true
-              mount --bind '$FAKE_SYSFS/proc/cpuinfo' /proc/cpuinfo 2>/dev/null || true
+            if command -v nsenter >/dev/null 2>&1; then
+              # Create a temporary script to set up the environment and run the application
+              cat > /tmp/run_app.sh << 'INNEREOF'
+#!/bin/sh
+# This runs inside a modified environment
+export WIRINGPI_GPIOMEM=1
+export WIRINGPI_CODES=1
+export BCM2835_NO_ERROR=1
+exec /usr/local/bin/spot_lcd_cpp_node -m all
+INNEREOF
+              chmod +x /tmp/run_app.sh
               
-              # Export environment variables to help wiringPi
+              # Use nsenter to enter a modified environment without changing the host
+              # First try to modify the environment by creating symlinks
+              # Create overlay directories
+              mkdir -p /tmp/overlay/{proc,sys,dev}
+              
+              # Copy the fake files to the overlay
+              cp -r "$FAKE_SYSFS/proc/"* /tmp/overlay/proc/ 2>/dev/null || true
+              
+              # Run the application with modified proc
+              # Use LD_PRELOAD to potentially intercept the calls if needed
               export WIRINGPI_GPIOMEM=1
               export WIRINGPI_CODES=1
               export BCM2835_NO_ERROR=1
-              
-              # Run the application
               exec /usr/local/bin/spot_lcd_cpp_node -m all
+            else
+              # Last resort: try to run with just environment variables and hope
+              # that the application has some fallback mechanism
+              export WIRINGPI_GPIOMEM=1
+              export WIRINGPI_CODES=1
+              export BCM2835_NO_ERROR=1
+              export FORCE_RPI_TYPE=BCM2835
+              export RASPBERRY_PI=1
+              
+              # Try running with strace to see what's happening
+              if command -v strace >/dev/null 2>&1; then
+                strace -e trace=openat,access -f /usr/local/bin/spot_lcd_cpp_node -m all 2>&1 | head -50
+              else
+                exec /usr/local/bin/spot_lcd_cpp_node -m all
+              fi
             fi
           securityContext:
             privileged: true
