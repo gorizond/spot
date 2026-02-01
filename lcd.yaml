@@ -68,6 +68,12 @@ spec:
             - name: host-sys
               mountPath: /host/sys
               readOnly: true
+            - name: host-device-tree
+              mountPath: /host/proc/device-tree
+              readOnly: true
+            - name: host-cpuinfo
+              mountPath: /host/proc/cpuinfo
+              readOnly: true
             - name: gpiomem
               mountPath: /dev/gpiomem
       volumes:
@@ -82,6 +88,14 @@ spec:
           hostPath:
             path: /sys
             type: Directory
+        - name: host-device-tree
+          hostPath:
+            path: /proc/device-tree
+            type: Directory
+        - name: host-cpuinfo
+          hostPath:
+            path: /proc/cpuinfo
+            type: File
         - name: gpiomem
           hostPath:
             path: /dev/gpiomem
