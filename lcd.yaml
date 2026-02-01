@@ -150,18 +150,31 @@ EOF
             mkdir -p "$FAKE_SYSFS/proc/device-tree"
             echo "Raspberry Pi 3 Model B Plus" > "$FAKE_SYSFS/proc/device-tree/model"
             
-            # Try to use mount namespace if available
+            # Try to use mount namespace if available to isolate our changes
             if command -v unshare >/dev/null 2>&1 && [ -w /proc/self/ns/mnt ]; then
               # Create new mount namespace and bind mount our fake files
               unshare -m -- sh -c "
                 mount --make-rslave / 2>/dev/null || true
                 mount --bind '$FAKE_SYSFS/proc/device-tree' /proc/device-tree 2>/dev/null || true
                 mount --bind '$FAKE_SYSFS/proc/cpuinfo' /proc/cpuinfo 2>/dev/null || true
+                # Export environment variables to help wiringPi
+                export WIRINGPI_GPIOMEM=1
+                export WIRINGPI_CODES=1
+                export BCM2835_NO_ERROR=1
                 exec /usr/local/bin/spot_lcd_cpp_node -m all
               "
             else
-              # Fallback: directly run the application with environment variables
-              # that should help bypass the board detection
+              # Directly bind mount the fake files to override the host's
+              mount --make-rslave / 2>/dev/null || true
+              mount --bind '$FAKE_SYSFS/proc/device-tree' /proc/device-tree 2>/dev/null || true
+              mount --bind '$FAKE_SYSFS/proc/cpuinfo' /proc/cpuinfo 2>/dev/null || true
+              
+              # Export environment variables to help wiringPi
+              export WIRINGPI_GPIOMEM=1
+              export WIRINGPI_CODES=1
+              export BCM2835_NO_ERROR=1
+              
+              # Run the application
               exec /usr/local/bin/spot_lcd_cpp_node -m all
             fi
           securityContext:
