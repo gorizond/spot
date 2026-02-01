@@ -119,41 +119,93 @@ spec:
           - /bin/sh
           - -c
           - |
-            # Create a temporary directory structure to overlay device tree info
-            mkdir -p /tmp/device-overlay/proc/device-tree/system
-            mkdir -p /tmp/device-overlay/proc
+            # Wait a moment for system to stabilize
+            sleep 2
             
-            # Copy the files from our init-container to the overlay
-            if [ -f /tmp/device-info/linux,revision ]; then
-              cp /tmp/device-info/linux,revision /tmp/device-overlay/proc/device-tree/system/
-            elif [ -f /tmp/device-info/revision ]; then
-              cp /tmp/device-info/revision /tmp/device-overlay/proc/device-tree/
+            # Create a fake device tree in a temporary location
+            FAKE_SYSFS="/tmp/fake_sysfs"
+            mkdir -p "$FAKE_SYSFS/proc/device-tree/system"
+            
+            # Create a fake revision file based on common Raspberry Pi values
+            echo -ne '\x00\x00\x00\x00' > "$FAKE_SYSFS/proc/device-tree/system/linux,revision"  # Common fake value
+            
+            # Create a fake cpuinfo with hardware info
+            mkdir -p "$FAKE_SYSFS/proc"
+            cat > "$FAKE_SYSFS/proc/cpuinfo" << 'EOF'
+            processor	: 0
+            model name	: ARMv7 Processor rev 4 (v7l)
+            BogoMIPS	: 38.40
+            Features	: half thumb fastmult vfp edsp neon vfpv3 tls vfpv4 idiva idivt vfpd32 lpae evtstrm crc32 
+            CPU implementer	: 0x41
+            CPU architecture: 7
+            CPU variant	: 0x0
+            CPU part	: 0xd03
+            CPU revision	: 4
+            
+            processor	: 1
+            model name	: ARMv7 Processor rev 4 (v7l)
+            BogoMIPS	: 38.40
+            Features	: half thumb fastmult vfp edsp neon vfpv3 tls vfpv4 idiva idivt vfpd32 lpae evtstrm crc32 
+            CPU implementer	: 0x41
+            CPU architecture: 7
+            CPU variant	: 0x0
+            CPU part	: 0xd03
+            CPU revision	: 4
+            
+            processor	: 2
+            model name	: ARMv7 Processor rev 4 (v7l)
+            BogoMIPS	: 38.40
+            Features	: half thumb fastmult vfp edsp neon vfpv3 tls vfpv4 idiva idivt vfpd32 lpae evtstrm crc32 
+            CPU implementer	: 0x41
+            CPU architecture: 7
+            CPU variant	: 0x0
+            CPU part	: 0xd03
+            CPU revision	: 4
+            
+            processor	: 3
+            model name	: ARMv7 Processor rev 4 (v7l)
+            BogoMIPS	: 38.40
+            Features	: half thumb fastmult vfp edsp neon vfpv3 tls vfpv4 idiva idivt vfpd32 lpae evtstrm crc32 
+            CPU implementer	: 0x41
+            CPU architecture: 7
+            CPU variant	: 0x0
+            CPU part	: 0xd03
+            CPU revision	: 4
+            
+            Hardware	: BCM2835
+            Revision	: a020d3
+            Serial		: 0000000012345678
+            Model		: Raspberry Pi 3 Model B Plus Rev 1.3
+EOF
+            
+            # Now use mount namespaces to make these files visible to wiringPi
+            # First check if we can mount (we have privileged access)
+            if [ -w /proc/self/ns/mnt ]; then
+                # Create a new mount namespace
+                unshare -m --propagation slave sh -c '
+                    # Mount our fake files over the real ones (inside this namespace)
+                    mount --bind "'$FAKE_SYSFS'/proc/device-tree" /proc/device-tree 2>/dev/null || true
+                    mount --bind "'$FAKE_SYSFS'/proc/cpuinfo" /proc/cpuinfo 2>/dev/null || true
+                    
+                    # Export environment variables to help wiringPi
+                    export WIRINGPI_GPIOMEM=1
+                    export BCM2835_NO_ERROR=1
+                    
+                    # Run the application in this namespace
+                    exec /usr/local/bin/spot_lcd_cpp_node -m all
+                '
+            else
+                # If we can't create a new namespace, try the older approach
+                mount --bind "$FAKE_SYSFS/proc/device-tree" /proc/device-tree 2>/dev/null || true
+                mount --bind "$FAKE_SYSFS/proc/cpuinfo" /proc/cpuinfo 2>/dev/null || true
+                
+                # Export environment variables to help wiringPi
+                export WIRINGPI_GPIOMEM=1
+                export BCM2835_NO_ERROR=1
+                
+                # Run the application
+                exec /usr/local/bin/spot_lcd_cpp_node -m all
             fi
-            
-            # Copy cpuinfo if available
-            if [ -f /tmp/device-info/cpuinfo ]; then
-              cp /tmp/device-info/cpuinfo /tmp/device-overlay/proc/cpuinfo
-            elif [ -f /tmp/device-info/hardware_fallback ]; then
-              # Create a cpuinfo with fallback hardware info
-              echo "" > /tmp/device-overlay/proc/cpuinfo
-              cat /tmp/device-info/hardware_fallback >> /tmp/device-overlay/proc/cpuinfo
-            fi
-            
-            # Create model file if available
-            if [ -f /tmp/device-info/model ]; then
-              cp /tmp/device-info/model /tmp/device-overlay/proc/device-tree/
-            fi
-            
-            # Use mount to overlay our device info over the original paths
-            mount --bind /tmp/device-overlay/proc/device-tree /proc/device-tree 2>/dev/null || true
-            mount --bind /tmp/device-overlay/proc/cpuinfo /proc/cpuinfo 2>/dev/null || true
-            
-            # Alternative approach: try to trick wiringPi with environment variables
-            export WIRINGPI_GPIOMEM=1
-            export BCM2835_NO_ERROR=1
-            
-            # Run the actual application
-            exec /usr/local/bin/spot_lcd_cpp_node -m all
           securityContext:
             privileged: true
             runAsUser: 0
