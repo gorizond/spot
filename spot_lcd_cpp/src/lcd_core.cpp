@@ -68,11 +68,15 @@ bool LcdDisplay::initialize() {
     std::cout << "LCD initialized in simulation mode" << std::endl;
     initialized_ = true;
 #else
-    // Инициализация WiringPi
-    if (wiringPiSetup() == -1) {
-        std::cerr << "Failed to initialize WiringPi" << std::endl;
-        initialized_ = false;
-        return false;
+    // Используем альтернативную инициализацию WiringPi, которая не требует определения типа платы
+    // wiringPiSetupGpio() использует нумерацию GPIO пинов (Broadcom)
+    if (wiringPiSetupGpio() == -1) {
+        // Если не удалось, пробуем физическую нумерацию пинов
+        if (wiringPiSetupPhys() == -1) {
+            std::cerr << "Failed to initialize WiringPi in both GPIO and Physical modes" << std::endl;
+            initialized_ = false;
+            return false;
+        }
     }
 
     // Устанавливаем GPIO пины как выходы
