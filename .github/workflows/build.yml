@@ -13,28 +13,29 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: Set up Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
-        
     - name: Install dependencies
       run: |
-        npm ci
-        # Если у нас есть зависимости для C++ части LCD
+        # Устанавливаем зависимости для сборки C++ части LCD
         if [ -f "spot_lcd_cpp/CMakeLists.txt" ]; then
           sudo apt-get update
-          sudo apt-get install -y cmake libwiringpi-dev
+          sudo apt-get install -y cmake build-essential libwiringpi-dev
         fi
         
-    - name: Build project
+    - name: Build LCD C++ project
       run: |
         # Проверяем, есть ли CMakeLists.txt и собираем C++ часть, если она есть
         if [ -f "spot_lcd_cpp/CMakeLists.txt" ]; then
           cd spot_lcd_cpp
           mkdir -p build
           cd build
-          cmake ..
-          make
+          cmake .. -DENABLE_GPIO=OFF -DENABLE_ROS2=OFF -DCMAKE_BUILD_TYPE=Release
+          make -j$(nproc)
           cd ../..
+        fi
+        
+    - name: Build LCD Docker image
+      run: |
+        # Собираем Docker образ для LCD приложения
+        if [ -f "Dockerfile.lcd-cpp" ]; then
+          docker build -f Dockerfile.lcd-cpp -t spot-lcd-cpp:test .
         fi
