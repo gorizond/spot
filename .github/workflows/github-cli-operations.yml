@@ -1,0 +1,92 @@
+name: GitHub CLI Operations
+
+on:
+  schedule:
+    - cron: '0 9 * * *'  # Ежедневно в 9:00 UTC
+  workflow_dispatch:
+  issues:
+    types: [opened, closed]
+  pull_request:
+    types: [opened, closed]
+
+permissions:
+  issues: write
+  pull-requests: write
+  contents: read
+
+jobs:
+  github-cli-operations:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Configure GitHub CLI
+        run: |
+          gh config set pager cat
+          gh config set editor nano
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Repository Information
+        run: |
+          echo "Repository: $(gh repo view --json nameWithOwner | jq -r '.nameWithOwner')"
+          echo "Description: $(gh repo view --json description | jq -r '.description')"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: List Open Issues
+        run: |
+          echo "Open issues:"
+          gh issue list --state open --limit 10 --json number,title,state,createdAt,labels
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: List Recent PRs
+        run: |
+          echo "Recent pull requests:"
+          gh pr list --state all --limit 5 --json number,title,state,createdAt,mergedAt
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Weekly Report (only on scheduled runs)
+        if: github.event_name == 'schedule'
+        run: |
+          # Создание еженедельного отчета
+          REPORT_TITLE="Weekly Status Report - $(date +%Y-%m-%d)"
+          REPORT_BODY="## Weekly Status Report
+
+          **Repository**: $GITHUB_REPOSITORY
+          **Date**: $(date)
+
+          ## Activity Summary
+          - Total open issues: $(gh issue list --state open --json id --jq 'length')
+          - Total PRs opened: $(gh pr list --state open --json id --jq 'length')
+
+          ## Recent Changes
+          <!-- Add details about recent commits or changes -->
+          
+          ## Next Steps
+          <!-- Add planned activities for the upcoming week -->"
+
+          gh issue create \
+            --title "$REPORT_TITLE" \
+            --body "$REPORT_BODY" \
+            --label "report,automated"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Label Management
+        run: |
+          # Проверяем, есть ли необходимые метки, и создаем их при необходимости
+          LABELS=("status:triage" "status:in-progress" "status:blocked" "type:bug" "type:feature" "type:enhancement" "type:documentation")
+          
+          for label in "${LABELS[@]}"; do
+            if ! gh label list --json name | jq -r '.[].name' | grep -q "^${label}$"; then
+              echo "Creating label: $label"
+              gh label create "$label" --color "ffffff" --description "Automatically created label"
+            fi
+          done
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
