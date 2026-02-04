@@ -51,7 +51,21 @@ if(ENABLE_GPIO)
     endif()
 else()
     target_compile_definitions(${PROJECT_NAME}_node PRIVATE USE_GPIO=0)
-    # Ensure basic libraries are linked even without GPIO
+    # Even when GPIO is disabled, still link against wiringPi if available to avoid linker errors
+    # This ensures that the #ifdef USE_GPIO conditionals work correctly without linker errors
+    find_package(PkgConfig QUIET)
+    if(PkgConfig_FOUND)
+        pkg_check_modules(WIRINGPI wiringPi QUIET)
+        if(WIRINGPI_FOUND)
+            target_link_libraries(${PROJECT_NAME}_node ${WIRINGPI_LIBRARIES})
+        else()
+            find_library(WIRINGPI_LIB wiringPi)
+            if(WIRINGPI_LIB)
+                target_link_libraries(${PROJECT_NAME}_node ${WIRINGPI_LIB})
+            endif()
+        endif()
+    endif()
+    # Ensure basic libraries are linked
     target_link_libraries(${PROJECT_NAME}_node pthread)
 endif()
 
