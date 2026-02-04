@@ -1,1 +1,40 @@
-# Wed Feb  4 11:04:53 UTC 2026
+name: Build and Test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        
+    - name: Install dependencies
+      run: |
+        npm ci
+        # Если у нас есть зависимости для C++ части LCD
+        if [ -f "spot_lcd_cpp/CMakeLists.txt" ]; then
+          sudo apt-get update
+          sudo apt-get install -y cmake libwiringpi-dev
+        fi
+        
+    - name: Build project
+      run: |
+        # Проверяем, есть ли CMakeLists.txt и собираем C++ часть, если она есть
+        if [ -f "spot_lcd_cpp/CMakeLists.txt" ]; then
+          cd spot_lcd_cpp
+          mkdir -p build
+          cd build
+          cmake ..
+          make
+          cd ../..
+        fi
