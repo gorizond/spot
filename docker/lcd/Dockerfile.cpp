@@ -34,11 +34,6 @@ RUN apt-get update && apt-get install -y \
     libwiringpi-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Устанавливаем переменные окружения для корректной работы wiringPi в контейнере
-ENV WIRINGPI_GPIOMEM=1
-ENV WIRINGPI_CODES=1
-ENV BCM2835_NO_ERROR=1
-
 # Копируем исполняемый файл из стадии сборки
 COPY --from=builder /app/build/spot_lcd_cpp_node /usr/local/bin/
 COPY --from=builder /app/src/config /app/config

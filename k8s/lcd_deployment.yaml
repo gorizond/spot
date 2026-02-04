@@ -74,12 +74,6 @@ spec:
               mountPath: /app/config
             - name: gpiomem
               mountPath: /dev/gpiomem
-            - name: device-tree
-              mountPath: /proc/device-tree
-              readOnly: true
-            - name: cpuinfo
-              mountPath: /proc/cpuinfo
-              readOnly: true
       volumes:
         - name: spot-lcd-cpp-config-volume
           configMap:
@@ -88,11 +82,3 @@ spec:
           hostPath:
             path: /dev/gpiomem
             type: CharDevice
-        - name: device-tree
-          hostPath:
-            path: /proc/device-tree
-            type: Directory
-        - name: cpuinfo
-          hostPath:
-            path: /proc/cpuinfo
-            type: File
