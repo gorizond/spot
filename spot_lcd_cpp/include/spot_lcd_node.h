@@ -61,6 +61,14 @@ private:
 };
 #endif
 
+// GPIO definitions for libgpiod
+#ifdef USE_GPIO
+#include <gpiod.h>
+extern "C" {
+    #include <gpiod.h>
+}
+#endif
+
 class LcdDisplay {
 public:
     LcdDisplay(const LcdConfig& config);
@@ -77,6 +85,10 @@ private:
     bool setCursorPosition(uint8_t row, uint8_t col);
     
 #ifdef USE_GPIO
+    // GPIO resources for libgpiod
+    struct gpiod_chip *chip = nullptr;
+    struct gpiod_line *gpio_lines[6]; // RS, EN, D4, D5, D6, D7
+    
     void pulseEnable();
     void sendNibble(uint8_t data);
     void sendByte(uint8_t data, bool rs);

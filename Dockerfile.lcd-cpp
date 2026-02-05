@@ -1,0 +1,49 @@
+# Multi-stage Dockerfile for Spot LCD C++ application
+
+# Stage 1: Build stage
+FROM ubuntu:22.04 AS builder
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    cmake \
+    git \
+    pkg-config \
+    libgpiod-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy source code
+COPY spot_lcd_cpp /app/src
+
+# Create build directory and compile
+WORKDIR /app/build
+RUN cmake /app/src -DENABLE_GPIO=ON -DENABLE_ROS2=OFF -DCMAKE_BUILD_TYPE=Release && \
+    make -j$(nproc)
+
+# Stage 2: Runtime stage
+FROM ubuntu:22.04 AS runtime
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y \
+    libstdc++6 \
+    libgcc-s1 \
+    libgpiod2 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy the executable from the build stage
+COPY --from=builder /app/build/spot_lcd_cpp_node /usr/local/bin/
+COPY --from=builder /app/src/config /app/config
+
+# Create a non-root user for security
+RUN useradd -m -u 1000 lcduser
+USER lcduser
+WORKDIR /app
+
+# Expose any necessary ports (if needed for debugging)
+EXPOSE 8080
+
+# Default command
+ENTRYPOINT ["/usr/local/bin/spot_lcd_cpp_node"]
+CMD ["-m", "all"]

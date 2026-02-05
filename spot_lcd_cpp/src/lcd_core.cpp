@@ -1,8 +1,10 @@
 #include "spot_lcd_node.h"
 
 #ifdef USE_GPIO
-#include <wiringPi.h>
+#include <gpiod.h>
 #include <unistd.h>
+#include <iostream>
+#include <thread>
 #else
 #include <iostream>
 #include <unistd.h>
@@ -10,14 +12,34 @@
 
 LcdDisplay::LcdDisplay(const LcdConfig& config) : config_(config) {}
 
-LcdDisplay::~LcdDisplay() {}
+LcdDisplay::~LcdDisplay() {
+#ifndef USE_GPIO
+    std::cout << "LCD destructor called in simulation mode" << std::endl;
+#else
+    // Release GPIO lines if they were acquired
+    if (chip) {
+        for (auto& line : gpio_lines) {
+            if (line >= 0) {
+                gpiod_line_release(line);
+            }
+        }
+        gpiod_chip_close(chip);
+    }
+#endif
+}
 
 void LcdDisplay::pulseEnable() {
 #ifdef USE_GPIO
-    digitalWrite(config_.pin_en, HIGH);
-    usleep(1); // Enable pulse > 450ns
-    digitalWrite(config_.pin_en, LOW);
-    usleep(1); // > 450ns
+    // Set EN pin HIGH
+    if (gpiod_line_set_value(gpio_lines[1], 1) < 0) {
+        std::cerr << "Failed to set EN HIGH" << std::endl;
+    }
+    usleep(1000); // Enable pulse > 450ns
+    // Set EN pin LOW
+    if (gpiod_line_set_value(gpio_lines[1], 0) < 0) {
+        std::cerr << "Failed to set EN LOW" << std::endl;
+    }
+    usleep(1000); // > 450ns
 #endif
 }
 
@@ -25,9 +47,10 @@ void LcdDisplay::sendNibble(uint8_t data) {
 #ifdef USE_GPIO
     // Устанавливаем значения на пинах данных
     for (int i = 0; i < 4; i++) {
-        int pin = config_.pins_data[i];
         int value = (data >> i) & 0x01;
-        digitalWrite(pin, value);
+        if (gpiod_line_set_value(gpio_lines[2+i], value) < 0) {
+            std::cerr << "Failed to set data pin " << i << " to " << value << std::endl;
+        }
     }
     
     pulseEnable();
@@ -37,7 +60,9 @@ void LcdDisplay::sendNibble(uint8_t data) {
 void LcdDisplay::sendByte(uint8_t data, bool rs) {
 #ifdef USE_GPIO
     // Устанавливаем RS
-    digitalWrite(config_.pin_rs, rs ? HIGH : LOW);
+    if (gpiod_line_set_value(gpio_lines[0], rs ? 1 : 0) < 0) {
+        std::cerr << "Failed to set RS to " << (rs ? "HIGH" : "LOW") << std::endl;
+    }
     
     // Отправляем старшие 4 бита
     sendNibble((data >> 4) & 0x0F);
@@ -68,32 +93,78 @@ bool LcdDisplay::initialize() {
     std::cout << "LCD initialized in simulation mode" << std::endl;
     initialized_ = true;
 #else
-    // Используем системный режим wiringPi, который работает в контейнере
-    // Этот режим позволяет обращаться к GPIO без определения версии платы
-    if (wiringPiSetupSys() == -1) {
-        std::cerr << "Failed to initialize WiringPi in sys mode" << std::endl;
-        // Пробуем включить эмуляцию, если невозможно получить доступ к GPIO
-        std::cerr << "Trying to continue in simulation mode..." << std::endl;
-        initialized_ = true;
-        return true; // Продолжаем работу в эмуляционном режиме
+    // Используем libgpiod для доступа к GPIO
+    chip = gpiod_chip_open_by_name("gpiochip0");
+    if (!chip) {
+        std::cerr << "Failed to open GPIO chip" << std::endl;
+        
+        // Пробуем другие возможные имена чипа
+        chip = gpiod_chip_open_by_name("pinctrl-bcm2835");  // Для Raspberry Pi
+        if (!chip) {
+            std::cerr << "Failed to open GPIO chip (both gpiochip0 and pinctrl-bcm2835)" << std::endl;
+            std::cerr << "Continuing in simulation mode..." << std::endl;
+            initialized_ = true;
+            return true;
+        }
     }
 
-    std::cout << "LCD initialized in GPIO sys mode" << std::endl;
+    // Получаем линии для всех GPIO пинов
+    // gpio_lines[0] = RS, gpio_lines[1] = EN, gpio_lines[2..5] = data pins
+    gpio_lines[0] = gpiod_chip_get_line(chip, config_.pin_rs);  // RS
+    gpio_lines[1] = gpiod_chip_get_line(chip, config_.pin_en);  // EN
+    gpio_lines[2] = gpiod_chip_get_line(chip, config_.pins_data[0]); // D4
+    gpio_lines[3] = gpiod_chip_get_line(chip, config_.pins_data[1]); // D5
+    gpio_lines[4] = gpiod_chip_get_line(chip, config_.pins_data[2]); // D6
+    gpio_lines[5] = gpiod_chip_get_line(chip, config_.pins_data[3]); // D7
 
-    // Устанавливаем GPIO пины как выходы
-    pinMode(config_.pin_rs, OUTPUT);
-    pinMode(config_.pin_en, OUTPUT);
-    
-    for (int pin : config_.pins_data) {
-        pinMode(pin, OUTPUT);
+    // Проверяем, что все линии успешно получены
+    for (int i = 0; i < 6; i++) {
+        if (!gpio_lines[i]) {
+            std::cerr << "Failed to get GPIO line for pin " << i << std::endl;
+            // Закрываем уже открытые линии
+            for (int j = 0; j < i; j++) {
+                if (gpio_lines[j]) {
+                    gpiod_line_release(gpio_lines[j]);
+                }
+            }
+            gpiod_chip_close(chip);
+            std::cerr << "Continuing in simulation mode..." << std::endl;
+            initialized_ = true;
+            return true;
+        }
     }
+
+    // Запрашиваем права на управление линиями (OUTPUT)
+    for (int i = 0; i < 6; i++) {
+        if (gpiod_line_request_output(gpio_lines[i], "spot-lcd", 0) < 0) {
+            std::cerr << "Failed to request output access for GPIO line " << i << std::endl;
+            // Закрываем уже открытые линии
+            for (int j = 0; j <= i; j++) {
+                if (gpio_lines[j]) {
+                    gpiod_line_release(gpio_lines[j]);
+                }
+            }
+            gpiod_chip_close(chip);
+            std::cerr << "Continuing in simulation mode..." << std::endl;
+            initialized_ = true;
+            return true;
+        }
+    }
+
+    std::cout << "LCD initialized with libgpiod" << std::endl;
 
     // Устанавливаем начальное состояние
-    digitalWrite(config_.pin_rs, LOW);
-    digitalWrite(config_.pin_en, LOW);
+    if (gpiod_line_set_value(gpio_lines[0], 0) < 0) {  // RS = LOW
+        std::cerr << "Failed to set initial RS state" << std::endl;
+    }
+    if (gpiod_line_set_value(gpio_lines[1], 0) < 0) {  // EN = LOW
+        std::cerr << "Failed to set initial EN state" << std::endl;
+    }
     
-    for (int pin : config_.pins_data) {
-        digitalWrite(pin, LOW);
+    for (int i = 2; i < 6; i++) {
+        if (gpiod_line_set_value(gpio_lines[i], 0) < 0) {  // Data pins = LOW
+            std::cerr << "Failed to set initial data pin state" << std::endl;
+        }
     }
 
     // Задержка для стабилизации

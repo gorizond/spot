@@ -72,13 +72,11 @@ spec:
           volumeMounts:
             - name: spot-lcd-cpp-config-volume
               mountPath: /app/config
-            - name: gpiomem
-              mountPath: /dev/gpiomem
       volumes:
         - name: spot-lcd-cpp-config-volume
           configMap:
             name: spot-lcd-cpp-config
-        - name: gpiomem
+        - name: gpiochip0
           hostPath:
-            path: /dev/gpiomem
+            path: /dev/gpiochip0
             type: CharDevice
