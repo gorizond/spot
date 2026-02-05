@@ -34,16 +34,16 @@ The LCD service supports selective module loading through command-line arguments
 
 ```bash
 # Run all modules
-./spot_lcd_node --module all
+./spot_lcd_cpp_node --module all
 
 # Run specific modules only (comma-separated)
-./spot_lcd_node --module temp,uptime
+./spot_lcd_cpp_node --module temp,uptime
 
 # Run only LCD display
-./spot_lcd_node --module lcd
+./spot_lcd_cpp_node --module lcd
 
 # Run only temperature and LCD
-./spot_lcd_node --module temp,lcd
+./spot_lcd_cpp_node --module temp,lcd
 ```
 
 This allows for flexible deployments depending on the required functionality.

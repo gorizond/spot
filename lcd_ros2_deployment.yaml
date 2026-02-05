@@ -44,18 +44,22 @@ spec:
         gorizond.io/spot-lcd: "true"
       containers:
       - name: lcd-display
-        image: spot_lcd_rust:latest
-        imagePullPolicy: Never
+        image: ghcr.io/gorizond/spot-lcd-cpp:latest
+        imagePullPolicy: Always
         securityContext:
           privileged: true
           runAsUser: 0
           runAsGroup: 0
           allowPrivilegeEscalation: true
-        env:
-        - name: ROS_DOMAIN_ID
-          value: "1"
-        command: ["/usr/local/bin/spot_lcd_node"]
-        args: ["--module", "all"]
+        command:
+        - /bin/sh
+        - -c
+        - |
+          # Set environment variables to enable GPIO access
+          export WIRINGPI_GPIOMEM=1
+          export WIRINGPI_CODES=1
+          export BCM2835_NO_ERROR=1
+          exec /usr/local/bin/spot_lcd_cpp_node -m all
         volumeMounts:
         - name: lcd-config-volume
           mountPath: /app/config
