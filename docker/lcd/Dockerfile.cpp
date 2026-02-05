@@ -7,8 +7,7 @@ RUN apt-get update && apt-get install -y \
     cmake \
     git \
     pkg-config \
-    wiringpi \
-    libwiringpi-dev \
+    libgpiod-dev \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -30,8 +29,7 @@ FROM ubuntu:22.04 AS runtime
 RUN apt-get update && apt-get install -y \
     libstdc++6 \
     libgcc-s1 \
-    wiringpi \
-    libwiringpi-dev \
+    libgpiod2 \
     && rm -rf /var/lib/apt/lists/*
 
 # Копируем исполняемый файл из стадии сборки
