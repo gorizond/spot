@@ -19,7 +19,7 @@ LcdDisplay::~LcdDisplay() {
     // Release GPIO lines if they were acquired
     if (chip) {
         for (auto& line : gpio_lines) {
-            if (line >= 0) {
+            if (line) {
                 gpiod_line_release(line);
             }
         }
