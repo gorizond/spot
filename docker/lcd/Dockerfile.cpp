@@ -12,27 +12,6 @@ RUN apt-get update && apt-get install -y \
     python3-pip \
     && rm -rf /var/lib/apt/lists/*
 
-# Установим ROS2 Kilted для сборки (для доступа к заголовочным файлам)
-RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
-    wget \
-    gnupg2 \
-    lsb-release \
-    && rm -rf /var/lib/apt/lists/*
-
-# Добавим ключ ROS
-RUN wget -q -O /tmp/ros_repo_key.gpg https://raw.githubusercontent.com/ros/rosdistro/master/ros.asc && \
-    gpg --batch --yes --dearmor -o /usr/share/keyrings/ros-archive-keyring.gpg /tmp/ros_repo_key.gpg && \
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/ros2.list
-
-# Установим ROS2 development libraries
-RUN apt-get update && apt-get install -y \
-    ros-kilted-rclcpp \
-    ros-kilted-std-msgs \
-    ros-kilted-builtin-interfaces \
-    && rm -rf /var/lib/apt/lists/*
-
-RUN echo 'source /opt/ros/kilted/setup.bash' >> /etc/bash.bashrc
-
 WORKDIR /app
 
 # Копируем исходный код
