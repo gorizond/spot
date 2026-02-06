@@ -1,4 +1,5 @@
 #include "spot_lcd_node.h"
+#ifdef USE_ROS2
 #include "rclcpp/rclcpp.hpp"
 #include "std_msgs/msg/string.hpp"
 #include <memory>
@@ -74,3 +75,40 @@ int main(int argc, char * argv[])
     rclcpp::shutdown();
     return 0;
 }
+#else
+
+// Альтернативная реализация без ROS2
+#include <iostream>
+#include <thread>
+#include <chrono>
+#include <map>
+#include <memory>
+
+int main(int argc, char * argv[])
+{
+    std::cout << "LCD Node running without ROS2" << std::endl;
+    
+    // Инициализация дисплея
+    Config config = Config::fromEnv();
+    auto display_service = std::make_unique<DisplayService>(config.lcd);
+    
+    std::map<std::string, std::string> data_map;
+    
+    // Запускаем цикл обновления дисплея
+    while(true) {
+        // Здесь должна быть логика получения данных температуры и аптайма
+        // Для упрощенной реализации используем фиктивные данные
+        std::string temp = "N/A";
+        std::string uptime = "N/A";
+        
+        if (display_service) {
+            display_service->setData("temperature", temp);
+            display_service->setData("uptime", uptime);
+        }
+        
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+    }
+    
+    return 0;
+}
+#endif

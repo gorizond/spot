@@ -1,4 +1,5 @@
 #include "spot_lcd_node.h"
+#ifdef USE_ROS2
 #include "rclcpp/rclcpp.hpp"
 #include "std_msgs/msg/string.hpp"
 #include <memory>
@@ -44,3 +45,31 @@ int main(int argc, char * argv[])
     rclcpp::shutdown();
     return 0;
 }
+#else
+
+// Альтернативная реализация без ROS2
+#include <iostream>
+#include <functional>
+
+int main(int argc, char * argv[])
+{
+    std::cout << "Uptime Node running without ROS2" << std::endl;
+    
+    Config config = Config::fromEnv();
+    
+    // Callback для обработки аптайма
+    auto uptime_callback = [](const std::string& uptime) {
+        std::cout << "Uptime: " << uptime << std::endl;
+    };
+    
+    auto uptime_monitor = std::make_unique<UptimeMonitor>(uptime_callback, config.uptime_monitor);
+    uptime_monitor->startMonitoring();
+    
+    // Ждем бесконечно
+    while(true) {
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+    }
+    
+    return 0;
+}
+#endif
