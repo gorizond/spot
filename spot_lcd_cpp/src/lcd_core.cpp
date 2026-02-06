@@ -246,7 +246,7 @@ bool LcdDisplay::writeChar(char c) {
     return true;
 }
 
-#ifdef USE_ROS2
+#if defined(USE_ROS2) && USE_ROS2
 RosPublisher::RosPublisher(rclcpp::Node::SharedPtr node) : node_(node) {
     temp_publisher_ = node_->create_publisher<std_msgs::msg::String>("lcd_temperature", 10);
     uptime_publisher_ = node_->create_publisher<std_msgs::msg::String>("lcd_uptime", 10);

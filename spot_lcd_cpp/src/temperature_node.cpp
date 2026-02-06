@@ -1,5 +1,6 @@
 #include "spot_lcd_node.h"
-#ifdef USE_ROS2
+
+#if defined(USE_ROS2) && USE_ROS2
 #include "rclcpp/rclcpp.hpp"
 #include "std_msgs/msg/string.hpp"
 #include <memory>
