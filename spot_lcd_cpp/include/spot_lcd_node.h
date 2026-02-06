@@ -44,7 +44,7 @@ struct Config {
     static Config fromEnv();
 };
 
-#ifdef USE_ROS2
+#if defined(USE_ROS2) && USE_ROS2
 #include "rclcpp/rclcpp.hpp"
 #include "std_msgs/msg/string.hpp"
 
@@ -59,6 +59,9 @@ private:
     rclcpp::Publisher<std_msgs::msg::String>::SharedPtr temp_publisher_;
     rclcpp::Publisher<std_msgs::msg::String>::SharedPtr uptime_publisher_;
 };
+#else
+// Forward declaration or empty class when ROS2 is disabled
+class RosPublisher {};
 #endif
 
 // GPIO definitions for libgpiod
