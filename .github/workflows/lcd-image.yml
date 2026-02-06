@@ -51,7 +51,7 @@ jobs:
             type=ref,event=branch
             type=sha,prefix=
 
-      - name: Build and push Docker image (C++ version)
+      - name: Build and push Docker image (C++ version with separated ROS2 nodes)
         id: push
         uses: docker/build-push-action@v5
         with:

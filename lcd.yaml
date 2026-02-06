@@ -21,23 +21,26 @@ data:
     [uptime_monitor]
     interval = 10
 ---
+# DaemonSet for LCD display node (handles LCD display and subscribes to temp/uptime topics)
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: spot-lcd-cpp
+  name: spot-lcd-display
   labels:
-    app.kubernetes.io/name: spot-lcd-cpp
+    app.kubernetes.io/name: spot-lcd-display
     app.kubernetes.io/part-of: spot
 spec:
   selector:
     matchLabels:
-      app.kubernetes.io/name: spot-lcd-cpp
+      app.kubernetes.io/name: spot-lcd-display
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: spot-lcd-cpp
+        app.kubernetes.io/name: spot-lcd-display
         app.kubernetes.io/part-of: spot
     spec:
+      hostPID: true  # Required for GPIO access
+      hostNetwork: true  # Required for direct GPIO access
       nodeSelector:
         kubernetes.io/arch: arm64
         gorizond.io/robot: "true"
@@ -46,15 +49,8 @@ spec:
         - name: lcd-display
           image: ghcr.io/gorizond/spot-lcd-cpp:latest
           imagePullPolicy: Always
-          command:
-          - /bin/sh
-          - -c
-          - |
-            # Set environment variables to enable GPIO access in sys mode
-            export WIRINGPI_GPIOMEM=1
-            export WIRINGPI_CODES=1
-            export BCM2835_NO_ERROR=1
-            exec /usr/local/bin/spot_lcd_cpp_node -m all
+          command: ["/usr/local/bin/run_node.sh"]
+          args: ["lcd"]
           securityContext:
             privileged: true
             runAsUser: 0
@@ -63,12 +59,6 @@ spec:
           env:
             - name: CXX_LOG_LEVEL
               value: "info"
-            - name: WIRINGPI_GPIOMEM
-              value: "1"
-            - name: WIRINGPI_CODES
-              value: "1"
-            - name: BCM2835_NO_ERROR
-              value: "1"
           volumeMounts:
             - name: spot-lcd-cpp-config-volume
               mountPath: /app/config
@@ -96,3 +86,97 @@ spec:
           hostPath:
             path: /proc/cpuinfo
             type: File
+---
+# DaemonSet for temperature monitoring node (publishes temperature data to ROS2 topics)
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: spot-temp-monitor
+  labels:
+    app.kubernetes.io/name: spot-temp-monitor
+    app.kubernetes.io/part-of: spot
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: spot-temp-monitor
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: spot-temp-monitor
+        app.kubernetes.io/part-of: spot
+    spec:
+      hostPID: true  # Required for accessing system files
+      nodeSelector:
+        kubernetes.io/arch: arm64
+        gorizond.io/robot: "true"
+        gorizond.io/spot-lcd: "true"
+      containers:
+        - name: temp-monitor
+          image: ghcr.io/gorizond/spot-lcd-cpp:latest
+          imagePullPolicy: Always
+          command: ["/usr/local/bin/run_node.sh"]
+          args: ["temperature"]
+          env:
+            - name: CXX_LOG_LEVEL
+              value: "info"
+          volumeMounts:
+            - name: spot-lcd-cpp-config-volume
+              mountPath: /app/config
+            - name: proc
+              mountPath: /proc
+              readOnly: true
+      volumes:
+        - name: spot-lcd-cpp-config-volume
+          configMap:
+            name: spot-lcd-cpp-config
+        - name: proc
+          hostPath:
+            path: /proc
+            type: Directory
+---
+# DaemonSet for uptime monitoring node (publishes uptime data to ROS2 topics)
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: spot-uptime-monitor
+  labels:
+    app.kubernetes.io/name: spot-uptime-monitor
+    app.kubernetes.io/part-of: spot
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: spot-uptime-monitor
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: spot-uptime-monitor
+        app.kubernetes.io/part-of: spot
+    spec:
+      hostPID: true  # Required for accessing system files
+      nodeSelector:
+        kubernetes.io/arch: arm64
+        gorizond.io/robot: "true"
+        gorizond.io/spot-lcd: "true"
+      containers:
+        - name: uptime-monitor
+          image: ghcr.io/gorizond/spot-lcd-cpp:latest
+          imagePullPolicy: Always
+          command: ["/usr/local/bin/run_node.sh"]
+          args: ["uptime"]
+          env:
+            - name: CXX_LOG_LEVEL
+              value: "info"
+          volumeMounts:
+            - name: spot-lcd-cpp-config-volume
+              mountPath: /app/config
+            - name: proc
+              mountPath: /proc
+              readOnly: true
+      volumes:
+        - name: spot-lcd-cpp-config-volume
+          configMap:
+            name: spot-lcd-cpp-config
+        - name: proc
+          hostPath:
+            path: /proc
+            type: Directory

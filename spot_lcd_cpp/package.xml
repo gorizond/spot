@@ -3,7 +3,7 @@
 <package format="3">
   <name>spot_lcd_cpp</name>
   <version>0.0.1</version>
-  <description>LCD display service for SPOT robot</description>
+  <description>LCD display service for SPOT robot with separate ROS2 nodes</description>
   <maintainer email="alexandr.negash@gmail.com">Alexandr</maintainer>
   <license>MIT</license>
 
@@ -19,4 +19,6 @@
   <export>
     <build_type>ament_cmake</build_type>
   </export>
+  
+  <exec_depend>ros2launch</exec_depend>
 </package>

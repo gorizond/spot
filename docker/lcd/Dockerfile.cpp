@@ -22,22 +22,34 @@ WORKDIR /app/build
 RUN cmake /app/src -DENABLE_GPIO=ON -DENABLE_ROS2=OFF -DCMAKE_BUILD_TYPE=Release && \
     make -j$(nproc)
 
-# Stage 2: Runtime stage
-FROM ubuntu:22.04 AS runtime
+# Stage 2: Runtime stage with ROS2 Kilted
+FROM ros:kilted-ros-base AS runtime
 
-# Устанавливаем минимальные зависимости для выполнения
+# Устанавливаем зависимости для выполнения
 RUN apt-get update && apt-get install -y \
     libstdc++6 \
     libgcc-s1 \
     libgpiod2 \
     && rm -rf /var/lib/apt/lists/*
 
-# Копируем исполняемый файл из стадии сборки
+# Копируем исполняемые файлы из стадии сборки
+COPY --from=builder /app/build/spot_lcd_cpp_lcd_node /usr/local/bin/
+COPY --from=builder /app/build/spot_lcd_cpp_temp_node /usr/local/bin/
+COPY --from=builder /app/build/spot_lcd_cpp_uptime_node /usr/local/bin/
 COPY --from=builder /app/build/spot_lcd_cpp_node /usr/local/bin/
-COPY --from=builder /app/src/config /app/config
+
+# Копируем launch файлы и скрипты
+COPY --from=builder /app/src/launch /app/launch
+COPY --from=builder /app/src/scripts/run_node.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/run_node.sh
 
 # Устанавливаем рабочую директорию
 WORKDIR /app
 
-# Точка входа
-ENTRYPOINT ["/usr/local/bin/spot_lcd_cpp_node", "-m", "all"]
+# Устанавливаем переменные окружения ROS2
+ENV ROS_DISTRO=kilted
+ENV RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+
+# Точка входа - по умолчанию запускаем все модули
+ENTRYPOINT ["/usr/local/bin/run_node.sh"]
+CMD ["all"]

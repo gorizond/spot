@@ -6,47 +6,91 @@ This repo is intentionally minimal.
 
 ## LCD Service
 
-This repository now includes a microservice architecture implementation for controlling an LCD1602 display on the Spot robot using Rust.
+This repository now includes a microservice architecture implementation for controlling an LCD1602 display on the Spot robot using C++ with ROS2.
 
 ### Architecture Overview
 
-The LCD service follows a microservice architecture with the following components:
+The LCD service follows a modular ROS2 architecture with the following components:
 
 - `lcd_core`: Low-level LCD hardware interface
 - `lcd_display_service`: High-level display management
 - `temp_monitor`: Temperature monitoring service
 - `uptime_monitor`: System uptime monitoring service
-- `ros_publisher`: ROS2 topic publishing
 - `config`: Configuration management
 
 ### Features
 
-- Written in safe Rust for memory safety
-- Configurable via TOML files
+- Written in C++ with ROS2 integration
+- Configurable via environment variables
 - Dockerized with multistage build for minimal footprint
 - Kubernetes-ready deployment manifests
-- GPIO control for Raspberry Pi
-- Selective module loading via command-line arguments
+- GPIO control for Raspberry Pi using libgpiod
+- Modular architecture with separate ROS2 nodes
 
-### Module Selection
+### Architecture Options
 
-The LCD service supports selective module loading through command-line arguments:
+The system now supports multiple deployment architectures:
 
+#### Monolithic Mode
+- Single executable with all modules combined
+- Compatible with previous implementations
+- Uses command-line flags to specify modules: `-m lcd,temp,uptime`
+
+#### Microservices Mode (Recommended)
+- Separate ROS2 nodes for each module:
+  - `spot_lcd_cpp_lcd_node`: Handles LCD display and subscribes to temperature/uptime topics
+  - `spot_lcd_cpp_temp_node`: Monitors and publishes temperature data
+  - `spot_lcd_cpp_uptime_node`: Monitors and publishes uptime data
+- Each node can run in separate containers from the same image
+- Nodes communicate via ROS2 topics
+
+### Running with Docker
+
+#### Single Container (All Nodes)
 ```bash
-# Run all modules
-./spot_lcd_cpp_node --module all
-
-# Run specific modules only (comma-separated)
-./spot_lcd_cpp_node --module temp,uptime
-
-# Run only LCD display
-./spot_lcd_cpp_node --module lcd
-
-# Run only temperature and LCD
-./spot_lcd_cpp_node --module temp,lcd
+docker build -f Dockerfile.lcd-cpp -t spot-lcd-cpp .
+docker run -d --device=/dev/gpiochip0:/dev/gpiochip0 -v /proc:/proc spot-lcd-cpp:latest all
 ```
 
-This allows for flexible deployments depending on the required functionality.
+#### Separate Containers (Modular Approach)
+```bash
+# Build the image
+docker build -f Dockerfile.lcd-cpp -t spot-lcd-cpp .
+
+# Run individual nodes
+docker run -d --name lcd-node spot-lcd-cpp:latest lcd
+docker run -d --name temp-node spot-lcd-cpp:latest temperature  
+docker run -d --name uptime-node spot-lcd-cpp:latest uptime
+```
+
+### Available Commands
+
+The entrypoint script supports the following commands:
+- `lcd` - Run only the LCD display node
+- `temperature` or `temp` - Run only the temperature monitoring node
+- `uptime` - Run only the uptime monitoring node
+- `all` or `combined` - Run the legacy combined node
+
+### Fleet/GitOps Deployment
+
+The system is configured for Fleet-based deployment using the files in the root directory:
+
+- `fleet.yaml` - Main Fleet configuration
+- `kustomization.yaml` - Kustomize configuration
+- `lcd.yaml` - Deployment definitions for LCD services (contains DaemonSets for all three nodes)
+- `deployment.yaml` - Main robot deployment
+
+The `lcd.yaml` file defines three separate DaemonSets that can run on nodes with the appropriate labels:
+
+1. `spot-lcd-display` - Handles LCD display functionality
+2. `spot-temp-monitor` - Monitors system temperature
+3. `spot-uptime-monitor` - Monitors system uptime
+
+To deploy with Fleet, ensure your nodes have the required labels:
+- `gorizond.io/robot=true`
+- `gorizond.io/spot-lcd=true`
+
+The deployment will automatically use the image from GitHub Container Registry: `ghcr.io/gorizond/spot-lcd-cpp:latest`
 
 ### Docker and CI/CD
 
@@ -54,7 +98,7 @@ The LCD service is fully integrated with GitHub Actions for automated building a
 
 - Docker images are automatically built and published to GitHub Container Registry
 - Workflow triggers on changes to LCD-related files
-- Images tagged with branch names, semantic versions, and git SHAs
+- Images tagged with branch names, semantic versions, and git SHAs.
 
 ## What runs
 

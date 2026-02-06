@@ -60,7 +60,7 @@ if [ $? -ne 0 ]; then
 fi
 
 echo "Build completed successfully!"
-echo "Executable location:"
-ls -la ./spot_lcd_cpp_node
+echo "Built executables:"
+ls -la ./spot_lcd_cpp_*
 
 echo "=== Build process finished ==="
