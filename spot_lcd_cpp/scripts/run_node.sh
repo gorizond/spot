@@ -3,8 +3,16 @@
 # Script to select and run the appropriate ROS2 node based on command line argument
 NODE_TYPE=${1:-"combined"}  # Default to "combined" if no argument provided
 
-# Source ROS2 environment
-source /opt/ros/humble/setup.bash
+# Source ROS2 environment (prefer ROS_DISTRO, fallback to kilted/humble)
+if [ -n "${ROS_DISTRO:-}" ] && [ -f "/opt/ros/${ROS_DISTRO}/setup.bash" ]; then
+  source "/opt/ros/${ROS_DISTRO}/setup.bash"
+elif [ -f /opt/ros/kilted/setup.bash ]; then
+  source /opt/ros/kilted/setup.bash
+elif [ -f /opt/ros/humble/setup.bash ]; then
+  source /opt/ros/humble/setup.bash
+else
+  echo "WARN: ROS2 setup.bash not found; running without ROS2"
+fi
 
 case "$NODE_TYPE" in
     "lcd")

@@ -68,6 +68,8 @@ spec:
               mountPath: /app/config
             - name: gpiomem
               mountPath: /dev/gpiomem
+            - name: gpiochip0
+              mountPath: /dev/gpiochip0
             - name: device-tree
               mountPath: /proc/device-tree
               readOnly: true
@@ -81,6 +83,10 @@ spec:
         - name: gpiomem
           hostPath:
             path: /dev/gpiomem
+            type: CharDevice
+        - name: gpiochip0
+          hostPath:
+            path: /dev/gpiochip0
             type: CharDevice
         - name: device-tree
           hostPath:
@@ -110,6 +116,7 @@ spec:
         app.kubernetes.io/part-of: spot
     spec:
       hostPID: true  # Required for accessing system files
+      hostNetwork: true  # ROS2 DDS discovery across pods
       nodeSelector:
         kubernetes.io/arch: arm64
         gorizond.io/robot: "true"
@@ -163,6 +170,7 @@ spec:
         app.kubernetes.io/part-of: spot
     spec:
       hostPID: true  # Required for accessing system files
+      hostNetwork: true  # ROS2 DDS discovery across pods
       nodeSelector:
         kubernetes.io/arch: arm64
         gorizond.io/robot: "true"

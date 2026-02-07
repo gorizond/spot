@@ -1,7 +1,7 @@
 # Multi-stage Dockerfile for Spot LCD C++ application with separate ROS2 nodes
 
-# Stage 1: Build stage
-FROM ubuntu:22.04 AS builder
+# Stage 1: Build stage (ROS2-enabled)
+FROM ros:kilted-ros-base AS builder
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y \
@@ -19,8 +19,7 @@ COPY spot_lcd_cpp /app/src
 
 # Create build directory and compile
 WORKDIR /app/build
-RUN cmake /app/src -DENABLE_GPIO=ON -DENABLE_ROS2=OFF -DCMAKE_BUILD_TYPE=Release && \
-    make -j$(nproc)
+RUN bash -lc "source /opt/ros/kilted/setup.bash && cmake /app/src -DENABLE_GPIO=ON -DENABLE_ROS2=ON -DCMAKE_BUILD_TYPE=Release && make -j$(nproc)"
 
 # Stage 2: Runtime stage with ROS2 Kilted (matching the robot's ROS2 environment)
 FROM ros:kilted-ros-base AS runtime
