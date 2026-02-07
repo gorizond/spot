@@ -38,6 +38,8 @@ spec:
       labels:
         app.kubernetes.io/name: spot-lcd-display
         app.kubernetes.io/part-of: spot
+      annotations:
+        spot.gorizond.io/rev: "10f349d"
     spec:
       hostPID: true  # Required for GPIO access
       hostNetwork: true  # Required for direct GPIO access
@@ -114,6 +116,8 @@ spec:
       labels:
         app.kubernetes.io/name: spot-temp-monitor
         app.kubernetes.io/part-of: spot
+      annotations:
+        spot.gorizond.io/rev: "10f349d"
     spec:
       hostPID: true  # Required for accessing system files
       hostNetwork: true  # ROS2 DDS discovery across pods
@@ -168,6 +172,8 @@ spec:
       labels:
         app.kubernetes.io/name: spot-uptime-monitor
         app.kubernetes.io/part-of: spot
+      annotations:
+        spot.gorizond.io/rev: "10f349d"
     spec:
       hostPID: true  # Required for accessing system files
       hostNetwork: true  # ROS2 DDS discovery across pods
