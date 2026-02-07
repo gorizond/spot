@@ -4,6 +4,21 @@
 #include "rclcpp/rclcpp.hpp"
 #include "std_msgs/msg/string.hpp"
 #include <memory>
+#include <string>
+
+namespace {
+std::string escapeJson(const std::string& input) {
+    std::string out;
+    out.reserve(input.size());
+    for (char c : input) {
+        if (c == '\\' || c == '"') {
+            out.push_back('\\');
+        }
+        out.push_back(c);
+    }
+    return out;
+}
+}
 
 class TemperatureNode : public rclcpp::Node
 {
@@ -29,7 +44,12 @@ public:
 private:
     void PublishTemperature(const std::string& temp_str) {
         auto msg = std_msgs::msg::String();
-        msg.data = temp_str;
+        std::string payload =
+            "{\"line\":" + std::to_string(config_.temp_publish.line) +
+            ",\"col\":" + std::to_string(config_.temp_publish.col) +
+            ",\"width\":" + std::to_string(config_.temp_publish.width) +
+            ",\"text\":\"" + escapeJson(temp_str) + "\"}";
+        msg.data = payload;
         temp_publisher_->publish(msg);
         RCLCPP_DEBUG(this->get_logger(), "Published temperature: %s", temp_str.c_str());
     }

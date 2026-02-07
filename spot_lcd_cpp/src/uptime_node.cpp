@@ -4,6 +4,21 @@
 #include "rclcpp/rclcpp.hpp"
 #include "std_msgs/msg/string.hpp"
 #include <memory>
+#include <string>
+
+namespace {
+std::string escapeJson(const std::string& input) {
+    std::string out;
+    out.reserve(input.size());
+    for (char c : input) {
+        if (c == '\\' || c == '"') {
+            out.push_back('\\');
+        }
+        out.push_back(c);
+    }
+    return out;
+}
+}
 
 class UptimeNode : public rclcpp::Node
 {
@@ -29,7 +44,12 @@ public:
 private:
     void PublishUptime(const std::string& uptime_str) {
         auto msg = std_msgs::msg::String();
-        msg.data = uptime_str;
+        std::string payload =
+            "{\"line\":" + std::to_string(config_.uptime_publish.line) +
+            ",\"col\":" + std::to_string(config_.uptime_publish.col) +
+            ",\"width\":" + std::to_string(config_.uptime_publish.width) +
+            ",\"text\":\"" + escapeJson(uptime_str) + "\"}";
+        msg.data = payload;
         uptime_publisher_->publish(msg);
         RCLCPP_DEBUG(this->get_logger(), "Published uptime: %s", uptime_str.c_str());
     }

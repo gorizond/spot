@@ -20,6 +20,8 @@ struct LcdConfig {
     std::vector<int> pins_data = {23, 17, 18, 22};
     int cols = 16;
     int rows = 2;
+    int temp_line = 0;   // 0-based line index for temperature
+    int uptime_line = 1; // 0-based line index for uptime
 };
 
 struct TempMonitorConfig {
@@ -28,6 +30,12 @@ struct TempMonitorConfig {
 
 struct UptimeMonitorConfig {
     int interval = 10; // seconds
+};
+
+struct LcdPublishConfig {
+    int line = 1;  // 1-based
+    int col = 0;   // 0-based
+    int width = 8; // characters
 };
 
 struct RosPublisherConfig {
@@ -39,6 +47,8 @@ struct Config {
     LcdConfig lcd;
     TempMonitorConfig temp_monitor;
     UptimeMonitorConfig uptime_monitor;
+    LcdPublishConfig temp_publish;
+    LcdPublishConfig uptime_publish;
     RosPublisherConfig ros_publisher;
     
     static Config fromEnv();
@@ -105,11 +115,13 @@ public:
     
     void startDisplayLoop();
     std::shared_ptr<std::mutex> getLcdReference();
+    void setLineText(int line, const std::string& text);
+    void setSegment(int line, int col, int width, const std::string& text);
     void setData(const std::string& key, const std::string& value);
     
 private:
     std::shared_ptr<std::mutex> data_mutex_;
-    std::map<std::string, std::string> data_;
+    std::vector<std::string> lines_;
     LcdConfig config_;
     std::unique_ptr<LcdDisplay> lcd_display_;
     std::thread display_thread_;

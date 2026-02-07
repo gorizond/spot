@@ -59,6 +59,10 @@ spec:
           env:
             - name: CXX_LOG_LEVEL
               value: "info"
+            - name: LCD_TEMP_LINE
+              value: "0"
+            - name: LCD_UPTIME_LINE
+              value: "1"
           volumeMounts:
             - name: spot-lcd-cpp-config-volume
               mountPath: /app/config
@@ -119,6 +123,12 @@ spec:
           env:
             - name: CXX_LOG_LEVEL
               value: "info"
+            - name: TEMP_PUB_LINE
+              value: "1"
+            - name: TEMP_PUB_COL
+              value: "0"
+            - name: TEMP_PUB_WIDTH
+              value: "8"
           volumeMounts:
             - name: spot-lcd-cpp-config-volume
               mountPath: /app/config
@@ -166,6 +176,12 @@ spec:
           env:
             - name: CXX_LOG_LEVEL
               value: "info"
+            - name: UPTIME_PUB_LINE
+              value: "2"
+            - name: UPTIME_PUB_COL
+              value: "0"
+            - name: UPTIME_PUB_WIDTH
+              value: "8"
           volumeMounts:
             - name: spot-lcd-cpp-config-volume
               mountPath: /app/config
