@@ -92,7 +92,7 @@ private:
 #endif
 
 int main(int argc, char *argv[]) {
-#ifdef USE_ROS2
+#if defined(USE_ROS2) && USE_ROS2
     rclcpp::init(argc, argv);
     
     auto node = std::make_shared<SpotLcdNode>();
