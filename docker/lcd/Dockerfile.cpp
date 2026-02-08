@@ -13,6 +13,7 @@ RUN apt-get update && apt-get install -y \
     ros-kilted-builtin-interfaces \
     ros-kilted-rcutils \
     ros-kilted-rosidl-default-runtime \
+    ros-kilted-rmw-cyclonedds-cpp \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -34,6 +35,7 @@ RUN apt-get update && apt-get install -y \
     libstdc++6 \
     libgcc-s1 \
     libgpiod2 \
+    ros-kilted-rmw-cyclonedds-cpp \
     && rm -rf /var/lib/apt/lists/*
 
 # Копируем исполняемые файлы из стадии сборки
@@ -52,7 +54,7 @@ WORKDIR /app
 
 # Устанавливаем переменные окружения ROS2
 ENV ROS_DISTRO=kilted
-ENV RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+ENV RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 
 # Точка входа - по умолчанию запускаем все модули
 ENTRYPOINT ["/usr/local/bin/run_node.sh"]
