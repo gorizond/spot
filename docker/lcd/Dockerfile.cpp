@@ -1,13 +1,18 @@
 # Stage 1: Build stage (ROS2-enabled)
 FROM ros:kilted-ros-base AS builder
 
-# Устанавливаем зависимости для сборки
+# Устанавливаем разработчикские библиотеки ROS2 и другие зависимости для сборки
 RUN apt-get update && apt-get install -y \
     build-essential \
     cmake \
     git \
     pkg-config \
     libgpiod-dev \
+    ros-kilted-rclcpp \
+    ros-kilted-std-msgs \
+    ros-kilted-builtin-interfaces \
+    ros-kilted-rcutils \
+    ros-kilted-rosidl-default-runtime \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
