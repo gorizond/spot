@@ -149,11 +149,7 @@ if(ENABLE_ROS2)
     target_compile_definitions(${PROJECT_NAME}_uptime_node PRIVATE "USE_ROS2=1")
     target_compile_definitions(${PROJECT_NAME}_node PRIVATE "USE_ROS2=1")
     
-    target_link_libraries(${PROJECT_NAME}_lcd_node rclcpp std_msgs builtin_interfaces)
-    target_link_libraries(${PROJECT_NAME}_temp_node rclcpp std_msgs builtin_interfaces)
-    target_link_libraries(${PROJECT_NAME}_uptime_node rclcpp std_msgs builtin_interfaces)
-    target_link_libraries(${PROJECT_NAME}_node rclcpp std_msgs builtin_interfaces)
-    
+    # Используем ament_target_dependencies — это корректно добавит пути к библиотекам и нужные targets
     ament_target_dependencies(${PROJECT_NAME}_lcd_node rclcpp std_msgs builtin_interfaces)
     ament_target_dependencies(${PROJECT_NAME}_temp_node rclcpp std_msgs builtin_interfaces)
     ament_target_dependencies(${PROJECT_NAME}_uptime_node rclcpp std_msgs builtin_interfaces)
