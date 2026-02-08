@@ -26,6 +26,7 @@ The LCD service follows a modular ROS2 architecture with the following component
 - Kubernetes-ready deployment manifests
 - GPIO control for Raspberry Pi using libgpiod
 - Modular architecture with separate ROS2 nodes
+- **DDS:** uses CycloneDDS (`rmw_cyclonedds_cpp`) for reliable inter-container topic delivery on the robot
 
 ### Architecture Options
 

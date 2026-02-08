@@ -121,8 +121,8 @@ private:
             line -= 1; // convert to 0-based
         }
 
-        RCLCPP_INFO(this->get_logger(), "LCD payload: text='%s' line=%d col=%d width=%d raw='%s'",
-                    text.c_str(), line, col, width, payload.c_str());
+        RCLCPP_DEBUG(this->get_logger(), "LCD payload: text='%s' line=%d col=%d width=%d raw='%s'",
+                     text.c_str(), line, col, width, payload.c_str());
 
         std::lock_guard<std::mutex> lock(*(display_service_->getLcdReference()));
         display_service_->setSegment(line, col, width, text);
