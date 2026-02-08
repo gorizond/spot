@@ -1,5 +1,5 @@
-# Stage 1: Build stage
-FROM ubuntu:22.04 AS builder
+# Stage 1: Build stage (ROS2-enabled)
+FROM ros:kilted-ros-base AS builder
 
 # Устанавливаем зависимости для сборки
 RUN apt-get update && apt-get install -y \
@@ -8,8 +8,6 @@ RUN apt-get update && apt-get install -y \
     git \
     pkg-config \
     libgpiod-dev \
-    python3 \
-    python3-pip \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -20,9 +18,8 @@ COPY ../../../spot_lcd_cpp /app/src
 # Создаем директорию для сборки
 WORKDIR /app/build
 
-# Конфигурируем и собираем проект (GPIO включен)
-RUN cmake /app/src -DENABLE_GPIO=ON -DENABLE_ROS2=OFF -DCMAKE_BUILD_TYPE=Release && \
-    make -j$(nproc)
+# Конфигурируем и собираем проект (GPIO + ROS2 включены)
+RUN bash -lc "source /opt/ros/kilted/setup.bash && cmake /app/src -DENABLE_GPIO=ON -DENABLE_ROS2=ON -DCMAKE_BUILD_TYPE=Release && make -j$(nproc)"
 
 # Stage 2: Runtime stage with ROS2 Kilted
 FROM ros:kilted-ros-base AS runtime
@@ -50,7 +47,7 @@ WORKDIR /app
 
 # Устанавливаем переменные окружения ROS2
 ENV ROS_DISTRO=kilted
-ENV RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+ENV RMW_IMPLEMENTATION=rmw_fastrtps_cpp
 
 # Точка входа - по умолчанию запускаем все модули
 ENTRYPOINT ["/usr/local/bin/run_node.sh"]
