@@ -7,7 +7,7 @@ Docker image for the LCD service written in C++ with libgpiod GPIO access.
 To build the image locally:
 
 ```bash
-docker build -t spot-lcd-cpp:latest -f Dockerfile.lcd-cpp .
+docker build -t spot-lcd-cpp:latest -f docker/lcd/Dockerfile.cpp .
 ```
 
 ## Running the Container
@@ -33,7 +33,7 @@ docker run --privileged spot-lcd-cpp:latest -c "/usr/local/bin/spot_lcd_cpp_node
 This image is automatically built and pushed to GitHub Container Registry when changes are pushed to the main branch. The workflow is defined in `.github/workflows/lcd-image.yml`.
 
 The workflow:
-- Builds the Docker image when changes are made to `spot_lcd_cpp/**` or `Dockerfile.lcd-cpp`
+- Builds the Docker image when changes are made to `spot_lcd_cpp/**` or `docker/lcd/Dockerfile.cpp`
 - Pushes the image to `ghcr.io/gorizond/spot-lcd-cpp`
 - Tags the image with branch name, git SHA, and semantic versions
 

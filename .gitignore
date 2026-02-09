@@ -4,3 +4,5 @@ __pycache__/
 *.pyd
 .Python
 target/
+spot_lcd_cpp/build/
+spot_lcd_cpp/bin/

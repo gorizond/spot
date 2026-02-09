@@ -1,3 +1,0 @@
-/root/Yandex.Disk/Projects/gorizond/spot/spot_lcd_cpp/build/CMakeFiles/spot_lcd_cpp_node.dir
-/root/Yandex.Disk/Projects/gorizond/spot/spot_lcd_cpp/build/CMakeFiles/edit_cache.dir
-/root/Yandex.Disk/Projects/gorizond/spot/spot_lcd_cpp/build/CMakeFiles/rebuild_cache.dir

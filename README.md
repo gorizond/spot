@@ -49,14 +49,14 @@ The system now supports multiple deployment architectures:
 
 #### Single Container (All Nodes)
 ```bash
-docker build -f Dockerfile.lcd-cpp -t spot-lcd-cpp .
+docker build -f docker/lcd/Dockerfile.cpp -t spot-lcd-cpp .
 docker run -d --device=/dev/gpiochip0:/dev/gpiochip0 -v /proc:/proc spot-lcd-cpp:latest all
 ```
 
 #### Separate Containers (Modular Approach)
 ```bash
 # Build the image
-docker build -f Dockerfile.lcd-cpp -t spot-lcd-cpp .
+docker build -f docker/lcd/Dockerfile.cpp -t spot-lcd-cpp .
 
 # Run individual nodes
 docker run -d --name lcd-node spot-lcd-cpp:latest lcd
