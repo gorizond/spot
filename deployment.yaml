@@ -51,6 +51,8 @@ spec:
           image: ghcr.io/gorizond/spot-node-label-config-cpp:latest
           imagePullPolicy: Always
           env:
+            - name: RMW_IMPLEMENTATION
+              value: "rmw_fastrtps_cpp"
             - name: NODE_NAME
               valueFrom:
                 fieldRef:
@@ -72,7 +74,7 @@ spec:
             - |
               set -eo pipefail
               source /opt/ros/kilted/setup.bash
-              source /opt/spot_node_label_config_cpp/setup.bash
+              source /opt/spot_node_label_config_cpp/share/spot_node_label_config_cpp/local_setup.bash
               exec ros2 run spot_node_label_config_cpp spot_node_label_config_cpp_node
           volumeMounts: []
         - name: servo-driver

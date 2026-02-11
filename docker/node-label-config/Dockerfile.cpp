@@ -35,4 +35,4 @@ ENV ROS_DISTRO=kilted
 ENV RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 
 ENTRYPOINT ["bash", "-lc"]
-CMD ["source /opt/ros/kilted/setup.bash && source /opt/spot_node_label_config_cpp/setup.bash && exec ros2 run spot_node_label_config_cpp spot_node_label_config_cpp_node"]
+CMD ["source /opt/ros/kilted/setup.bash && source /opt/spot_node_label_config_cpp/share/spot_node_label_config_cpp/local_setup.bash && exec ros2 run spot_node_label_config_cpp spot_node_label_config_cpp_node"]
