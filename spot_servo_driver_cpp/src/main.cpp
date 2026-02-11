@@ -420,7 +420,12 @@ class SpotServoDriverCpp : public rclcpp::Node {
     if (extract_number_field(raw, "address", n)) addr = parse_int(n, 0x40);
 
     std::unordered_map<std::string, JointCfg> new_joints;
-    for (const auto &obj : extract_flat_objects(raw)) {
+    // Parse only one-level objects and keep those that explicitly contain joint+ch fields.
+    std::regex obj_re("\\{[^\\{\\}]*\\}");
+    auto ob = std::sregex_iterator(raw.begin(), raw.end(), obj_re);
+    auto oe = std::sregex_iterator();
+    for (auto it = ob; it != oe; ++it) {
+      const std::string obj = (*it).str();
       std::string joint;
       std::string ch_s;
       if (!extract_string_field(obj, "joint", joint)) continue;
