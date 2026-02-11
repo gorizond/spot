@@ -106,6 +106,8 @@ spec:
               value: "0"
             - name: DISARM_FULL_OFF
               value: "1"
+            - name: SERVO_DRIVER_REV
+              value: "2982ad3"
           command: ["bash", "-lc"]
           args:
             - |
