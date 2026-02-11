@@ -651,6 +651,8 @@ class SpotServoDriverCpp : public rclcpp::Node {
   rclcpp::TimerBase::SharedPtr timer_;
 };
 
+}  // namespace
+
 int main(int argc, char **argv) {
   rclcpp::init(argc, argv);
   auto node = std::make_shared<SpotServoDriverCpp>();
