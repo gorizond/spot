@@ -2,7 +2,7 @@
 
 Robot stack for SpotMicro/Spot running **ROS 2 Kilted** on **k3s (Raspberry Pi)**, deployed via **Rancher Fleet** (GitOps).
 
-This repo is intentionally minimal.
+This repository contains deployment manifests, runtime services, and operations notes for the Spot robot stack.
 
 ## LCD Service
 
@@ -26,7 +26,7 @@ The LCD service follows a modular ROS2 architecture with the following component
 - Kubernetes-ready deployment manifests
 - GPIO control for Raspberry Pi using libgpiod
 - Modular architecture with separate ROS2 nodes
-- **DDS:** uses CycloneDDS (`rmw_cyclonedds_cpp`) for reliable inter-container topic delivery on the robot
+- **DDS (LCD service):** supports CycloneDDS (`rmw_cyclonedds_cpp`) for reliable inter-container topic delivery on the robot
 
 ### Architecture Options
 
@@ -299,12 +299,15 @@ To enable CHAMP on a robot node:
 
 ### Image
 
-By default, `spot-champ` uses `ghcr.io/gorizond/spot-champ:main` (built and pushed by GitHub Actions in this repo).
+By default, `spot-champ` uses two images:
 
-- Tags: `main` (default branch) and `sha-<short>` (per-commit, immutable).
-- If your package is private, configure an `imagePullSecret` for GHCR.
+- `champ-controller`: `ghcr.io/gorizond/spot-champ:main`
+- `champ-bridge`: `ghcr.io/gorizond/spot-champ-bridge-cpp:latest`
 
-To build locally instead, edit `deployment.yaml` back to `spot-champ:local` and run:
+Both are built and pushed by GitHub Actions in this repository.
+If your package is private, configure an `imagePullSecret` for GHCR.
+
+To build the controller image locally instead, edit `deployment.yaml` and run:
 
 ```bash
 docker build -t spot-champ:local -f docker/champ/Dockerfile .
