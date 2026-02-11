@@ -182,7 +182,7 @@ spec:
       containers:
         - name: champ-controller
           image: ghcr.io/gorizond/spot-champ:main
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
           env:
             - name: PYTHONUNBUFFERED
               value: "1"
