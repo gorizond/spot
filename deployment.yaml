@@ -224,7 +224,7 @@ spec:
           imagePullPolicy: Always
           env:
             - name: CHAMP_GAIN
-              value: "-0.50"
+              value: "-0.30"
             - name: CHAMP_UPPER_RANGE_RAD
               value: "1.30"
             - name: CHAMP_LOWER_RANGE_RAD
@@ -234,13 +234,13 @@ spec:
             - name: CHAMP_BRIDGE_HZ
               value: "20"
             - name: STAND_HIP
-              value: "0.02"
+              value: "0.00"
             - name: STAND_UPPER
               value: "0.05"
             - name: STAND_LOWER
               value: "0.05"
             - name: STAND_HIP_REAR_OFFSET
-              value: "0.0"
+              value: "0.04"
             - name: STAND_REAR_UPPER_OFFSET
               value: "0.0"
             - name: STAND_REAR_LOWER_OFFSET
