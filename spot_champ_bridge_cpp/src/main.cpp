@@ -118,7 +118,7 @@ class ChampBridgeNode : public rclcpp::Node {
         joint_states_topic_(getenv_or("JOINT_STATES_TOPIC", "/joint_states")),
         status_topic_(getenv_or("STATUS_TOPIC", "/spot/state/servo")),
         cmd_topic_(getenv_or("CMD_TOPIC", "/spot/cmd/servo_auto")),
-        gain_(clampd(getenv_double("CHAMP_GAIN", 0.25), 0.0, 2.0)),
+        gain_(clampd(getenv_double("CHAMP_GAIN", 0.25), -2.0, 2.0)),
         publish_hz_(std::max(1.0, getenv_double("CHAMP_BRIDGE_HZ", 50.0))),
         hip_range_(std::max(1e-6, getenv_double("CHAMP_HIP_RANGE_RAD", 0.55))),
         upper_range_(std::max(1e-6, getenv_double("CHAMP_UPPER_RANGE_RAD", 1.0))),
