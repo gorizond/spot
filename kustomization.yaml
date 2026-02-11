@@ -11,11 +11,7 @@ resources:
 configMapGenerator:
   - name: spot-node-label-config
     files:
-      - node_label_config.py
-      - servo_driver.py
       - spot_cli.py
-      - cmd_mux.py
-      - champ_bridge.py
       - spotmicroai.urdf.xacro
       - joints_ros2.yaml
       - links_ros2.yaml

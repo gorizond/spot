@@ -150,15 +150,8 @@ spec:
             name: spot-node-label-config
             defaultMode: 0555
             items:
-              - key: node_label_config.py
-                path: node_label_config.py
-                # kept for reference; C++ implementation is used by default
-              - key: servo_driver.py
-                path: servo_driver.py
               - key: spot_cli.py
                 path: spot_cli.py
-              - key: cmd_mux.py
-                path: cmd_mux.py
         - name: i2c-1
           hostPath:
             path: /dev/i2c-1
@@ -266,8 +259,6 @@ spec:
             name: spot-node-label-config
             defaultMode: 0555
             items:
-              - key: champ_bridge.py
-                path: champ_bridge.py
               - key: spotmicroai.urdf.xacro
                 path: champ/spotmicroai.urdf.xacro
               - key: joints_ros2.yaml
