@@ -229,6 +229,8 @@ spec:
               value: "1.30"
             - name: CHAMP_LOWER_RANGE_RAD
               value: "1.30"
+            - name: CHAMP_HIP_SIGN
+              value: "-1.0"
             - name: CHAMP_BRIDGE_HZ
               value: "20"
             - name: STAND_HIP

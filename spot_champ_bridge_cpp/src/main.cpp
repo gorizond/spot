@@ -123,6 +123,7 @@ class ChampBridgeNode : public rclcpp::Node {
         hip_range_(std::max(1e-6, getenv_double("CHAMP_HIP_RANGE_RAD", 0.55))),
         upper_range_(std::max(1e-6, getenv_double("CHAMP_UPPER_RANGE_RAD", 1.0))),
         lower_range_(std::max(1e-6, getenv_double("CHAMP_LOWER_RANGE_RAD", 1.0))),
+        hip_sign_(clampd(getenv_double("CHAMP_HIP_SIGN", 1.0), -1.0, 1.0)),
         require_armed_(getenv_bool("CHAMP_REQUIRE_ARMED", true)),
         stand_hip_(clampd(getenv_double("STAND_HIP", 0.02), -1.0, 1.0)),
         stand_upper_(clampd(getenv_double("STAND_UPPER", 0.05), -1.0, 1.0)),
@@ -203,6 +204,7 @@ class ChampBridgeNode : public rclcpp::Node {
       const double zero = zero_by_joint_.count(msg.name[i]) ? zero_by_joint_[msg.name[i]] : 0.0;
       const double delta = msg.position[i] - zero;
       double scaled = clampd(delta / range_for(mapped->kind), -1.0, 1.0);
+      if (mapped->kind == "hip") scaled *= hip_sign_;
       double out = clampd(stand_base(mapped->out_name, mapped->kind) + scaled * gain_, -1.0, 1.0);
       targets[mapped->out_name] = out;
     }
@@ -243,6 +245,7 @@ class ChampBridgeNode : public rclcpp::Node {
   double hip_range_;
   double upper_range_;
   double lower_range_;
+  double hip_sign_;
   bool require_armed_;
 
   double stand_hip_;
