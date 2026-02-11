@@ -229,11 +229,9 @@ spec:
               mountPath: /opt/spot
               readOnly: true
         - name: champ-bridge
-          image: ghcr.io/gorizond/spot-champ:main
+          image: ghcr.io/gorizond/spot-champ-bridge-cpp:latest
           imagePullPolicy: Always
           env:
-            - name: PYTHONUNBUFFERED
-              value: "1"
             - name: CHAMP_GAIN
               value: "0.50"
             - name: CHAMP_UPPER_RANGE_RAD
@@ -254,16 +252,18 @@ spec:
               value: "0.0"
             - name: STAND_REAR_LOWER_OFFSET
               value: "0.0"
+            - name: JOINT_STATES_TOPIC
+              value: "/joint_states"
+            - name: CMD_TOPIC
+              value: "/spot/cmd/servo_auto"
           command: ["bash", "-lc"]
           args:
             - |
               set -eo pipefail
               source /opt/ros/kilted/setup.bash
-              exec python3 /opt/spot/champ_bridge.py
-          volumeMounts:
-            - name: spot-node-label-config
-              mountPath: /opt/spot
-              readOnly: true
+              source /opt/spot_champ_bridge_cpp/share/spot_champ_bridge_cpp/local_setup.bash
+              exec ros2 run spot_champ_bridge_cpp spot_champ_bridge_cpp_node
+          volumeMounts: []
       volumes:
         - name: spot-node-label-config
           configMap:
