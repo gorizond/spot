@@ -121,11 +121,9 @@ spec:
             - name: i2c-1
               mountPath: /dev/i2c-1
         - name: cmd-mux
-          image: ros:kilted-ros-base
-          imagePullPolicy: IfNotPresent
+          image: ghcr.io/gorizond/spot-cmd-mux-cpp:latest
+          imagePullPolicy: Always
           env:
-            - name: PYTHONUNBUFFERED
-              value: "1"
             - name: AUTO_TOPIC
               value: "/spot/cmd/servo_auto"
             - name: MANUAL_TOPIC
@@ -140,16 +138,16 @@ spec:
               value: "auto"
             - name: MANUAL_TIMEOUT_S
               value: "0"
+            - name: STATUS_PUBLISH_S
+              value: "1.0"
           command: ["bash", "-lc"]
           args:
             - |
               set -eo pipefail
               source /opt/ros/kilted/setup.bash
-              exec python3 /opt/spot/cmd_mux.py
-          volumeMounts:
-            - name: spot-node-label-config
-              mountPath: /opt/spot
-              readOnly: true
+              source /opt/spot_cmd_mux_cpp/share/spot_cmd_mux_cpp/local_setup.bash
+              exec ros2 run spot_cmd_mux_cpp spot_cmd_mux_cpp_node
+          volumeMounts: []
       volumes:
         - name: spot-node-label-config
           configMap:
