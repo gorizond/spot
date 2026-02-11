@@ -303,7 +303,8 @@ class SpotServoDriverCpp : public rclcpp::Node {
 
     armed_ = start_armed_;
 
-    sub_servo_map_ = create_subscription<std_msgs::msg::String>(servo_map_topic_, 10,
+    auto qos_cfg = rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local();
+    sub_servo_map_ = create_subscription<std_msgs::msg::String>(servo_map_topic_, qos_cfg,
       std::bind(&SpotServoDriverCpp::on_servo_map, this, _1));
     sub_cmd_ = create_subscription<std_msgs::msg::String>(cmd_topic_, 10,
       std::bind(&SpotServoDriverCpp::on_cmd, this, _1));
