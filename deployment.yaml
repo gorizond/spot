@@ -224,7 +224,7 @@ spec:
           imagePullPolicy: Always
           env:
             - name: CHAMP_GAIN
-              value: "-0.30"
+              value: "-0.45"
             - name: CHAMP_UPPER_RANGE_RAD
               value: "1.30"
             - name: CHAMP_LOWER_RANGE_RAD
