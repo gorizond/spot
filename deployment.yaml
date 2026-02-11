@@ -78,16 +78,14 @@ spec:
               exec ros2 run spot_node_label_config_cpp spot_node_label_config_cpp_node
           volumeMounts: []
         - name: servo-driver
-          image: ros:kilted-ros-base
-          imagePullPolicy: IfNotPresent
+          image: ghcr.io/gorizond/spot-servo-driver-cpp:latest
+          imagePullPolicy: Always
           securityContext:
             privileged: true
             runAsUser: 0
             runAsGroup: 0
             allowPrivilegeEscalation: true
           env:
-            - name: PYTHONUNBUFFERED
-              value: "1"
             - name: SERVO_MAP_TOPIC
               value: "/spot/config/servo_map"
             - name: CMD_TOPIC
@@ -113,11 +111,9 @@ spec:
             - |
               set -eo pipefail
               source /opt/ros/kilted/setup.bash
-              exec python3 /opt/spot/servo_driver.py
+              source /opt/spot_servo_driver_cpp/share/spot_servo_driver_cpp/local_setup.bash
+              exec ros2 run spot_servo_driver_cpp spot_servo_driver_cpp_node
           volumeMounts:
-            - name: spot-node-label-config
-              mountPath: /opt/spot
-              readOnly: true
             - name: i2c-1
               mountPath: /dev/i2c-1
         - name: cmd-mux
