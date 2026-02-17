@@ -8,7 +8,6 @@ RUN apt-get update && apt-get install -y \
     pkg-config \
     libgpiod-dev \
     ros-kilted-rclcpp \
-    ros-kilted-std-msgs \
     ros-kilted-sensor-msgs \
     && rm -rf /var/lib/apt/lists/*
 
