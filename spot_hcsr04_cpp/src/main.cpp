@@ -72,7 +72,7 @@ class HCSr04Node final : public rclcpp::Node {
     // Open GPIO chip
     chip_ = gpiod_chip_open_by_name("gpiochip0");
     if (!chip_) {
-      RCLCPP_CRITICAL(get_logger(), "Failed to open gpiochip0");
+      RCLCPP_FATAL(get_logger(), "Failed to open gpiochip0");
       throw std::runtime_error("GPIO init failed");
     }
 
