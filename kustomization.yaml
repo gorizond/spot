@@ -7,6 +7,7 @@ resources:
   - i2c-bootstrap.yaml
   - lcd.yaml
   - performance-setup.yaml
+  - hcsr04.yaml
 
 configMapGenerator:
   - name: spot-node-label-config

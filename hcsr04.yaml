@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: spot-hcsr04
+  labels:
+    app.kubernetes.io/name: spot-hcsr04
+    app.kubernetes.io/part-of: spot
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: spot-hcsr04
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: spot-hcsr04
+        app.kubernetes.io/part-of: spot
+      annotations:
+        spot.gorizond.io/rev: "initial"
+    spec:
+      hostPID: true
+      hostNetwork: true
+      nodeSelector:
+        kubernetes.io/arch: arm64
+        gorizond.io/robot: "true"
+        gorizond.io/spot-hcsr04: "true"
+      containers:
+        - name: hcsr04
+          image: ghcr.io/gorizond/spot-hcsr04-cpp:latest
+          imagePullPolicy: Always
+          securityContext:
+            privileged: true
+            runAsUser: 0
+            runAsGroup: 0
+            allowPrivilegeEscalation: true
+          env:
+            - name: SENSORS
+              value: "front_left:5:12,front_right:6:13"
+            - name: RMW_IMPLEMENTATION
+              value: "rmw_fastrtps_cpp"
+          volumeMounts:
+            - name: gpiochip0
+              mountPath: /dev/gpiochip0
+      volumes:
+        - name: gpiochip0
+          hostPath:
+            path: /dev/gpiochip0
+            type: CharDevice

@@ -1,0 +1,32 @@
+# Stage 1: Build
+FROM ros:kilted-ros-base AS builder
+
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    cmake \
+    git \
+    pkg-config \
+    libgpiod-dev \
+    ros-kilted-rclcpp \
+    ros-kilted-std-msgs \
+    ros-kilted-sensor-msgs \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /ws
+COPY spot_hcsr04_cpp /ws/src/spot_hcsr04_cpp
+
+RUN bash -lc "source /opt/ros/kilted/setup.bash && colcon build --packages-select spot_hcsr04_cpp --cmake-args -DCMAKE_BUILD_TYPE=Release"
+
+# Stage 2: Runtime
+FROM ros:kilted-ros-base AS runtime
+
+ENV ROS_DISTRO=kilted
+
+RUN apt-get update && apt-get install -y \
+    libgpiod2 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /ws/install/spot_hcsr04_cpp /opt/spot_hcsr04_cpp
+
+ENTRYPOINT ["bash", "-lc"]
+CMD ["source /opt/ros/kilted/setup.bash && source /opt/spot_hcsr04_cpp/share/spot_hcsr04_cpp/local_setup.bash && exec ros2 run spot_hcsr04_cpp hcsr04_node"]
