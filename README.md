@@ -139,6 +139,14 @@ Quick troubleshooting (field checklist):
 4. Check 5V and GND quality at the sensor under load (brownouts/noisy GND cause unstable echoes).
 5. If left/right got physically rewired, update `SENSORS` mapping accordingly.
 
+### Known incident (2026-02-18)
+
+- Symptom: `front_left` was stuck around ~3–6 cm and frequently logged `rise_timeout`.
+- Verification: ECHO path used a proper voltage divider; wiring was rechecked/swapped on sensor side.
+- Root cause: faulty HC-SR04 module on the left channel.
+- Resolution: replacing the module restored stable measurements.
+- Related hardening: switched `spot-hcsr04` to `rmw_cyclonedds_cpp` and added minute-level status logging for easier diagnostics.
+
 ## What runs
 
 `deployment.yaml` deploys two DaemonSets (one pod per robot node):
