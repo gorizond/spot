@@ -15,7 +15,7 @@ spec:
         app.kubernetes.io/name: spot-hcsr04
         app.kubernetes.io/part-of: spot
       annotations:
-        spot.gorizond.io/rev: "initial"
+        spot.gorizond.io/rev: "1dab61a"
     spec:
       hostPID: true
       hostNetwork: true
@@ -36,7 +36,7 @@ spec:
             - name: SENSORS
               value: "front_left:5:12,front_right:6:13"
             - name: RMW_IMPLEMENTATION
-              value: "rmw_fastrtps_cpp"
+              value: "rmw_cyclonedds_cpp"
           volumeMounts:
             - name: gpiochip0
               mountPath: /dev/gpiochip0
