@@ -101,6 +101,44 @@ The LCD service is fully integrated with GitHub Actions for automated building a
 - Workflow triggers on changes to LCD-related files
 - Images tagged with branch names, semantic versions, and git SHAs.
 
+## HC-SR04 ultrasonic service
+
+`spot-hcsr04` is deployed via `hcsr04.yaml` as a dedicated DaemonSet:
+
+- image: `ghcr.io/gorizond/spot-hcsr04-cpp:latest`
+- GPIO access via `/dev/gpiochip0`
+- default sensors mapping (from `SENSORS`): `front_left:5:12,front_right:6:13`
+- DDS runtime: `RMW_IMPLEMENTATION=rmw_cyclonedds_cpp` (kept consistent with LCD stack)
+
+Published topics:
+
+- `/spot/sensor/ultrasonic/front_left/range`
+- `/spot/sensor/ultrasonic/front_right/range`
+
+The node performs staggered measurements and emits a **status line every minute** per sensor with:
+
+- TRIG/ECHO pins
+- distance in meters and centimeters
+- pulse width (`pulse_us`)
+- status (`ok`, `rise_timeout`, `fall_timeout`, `echo_read_error`)
+- measurement/timeouts counters (+delta per minute)
+
+Example logs:
+
+```bash
+kubectl -n spot-system logs ds/spot-hcsr04 --tail=100
+```
+
+Quick troubleshooting (field checklist):
+
+1. Verify there is no close obstacle in front of the sensor (bracket/cable/frame at 2–10 cm).
+2. If one channel is stuck around ~3–6 cm with frequent `rise_timeout`, swap **physical HC-SR04 modules** between sides:
+   - issue moves with module → faulty sensor module;
+   - issue stays on channel → wiring/pin/power path issue.
+3. Ensure ECHO line uses a proper 5V→3.3V divider/level shifting.
+4. Check 5V and GND quality at the sensor under load (brownouts/noisy GND cause unstable echoes).
+5. If left/right got physically rewired, update `SENSORS` mapping accordingly.
+
 ## What runs
 
 `deployment.yaml` deploys two DaemonSets (one pod per robot node):
