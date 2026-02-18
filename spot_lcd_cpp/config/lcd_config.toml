@@ -7,7 +7,7 @@ cols = 16
 rows = 2
 
 [temp_monitor]
-interval = 5
+interval = 10
 
 [uptime_monitor]
 interval = 10

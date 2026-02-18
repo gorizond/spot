@@ -25,7 +25,7 @@ struct LcdConfig {
 };
 
 struct TempMonitorConfig {
-    int interval = 5; // seconds
+    int interval = 10; // seconds
 };
 
 struct UptimeMonitorConfig {
