@@ -9,6 +9,7 @@ RUN apt-get update && apt-get install -y \
     libgpiod-dev \
     ros-kilted-rclcpp \
     ros-kilted-sensor-msgs \
+    ros-kilted-rmw-cyclonedds-cpp \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /ws
@@ -20,9 +21,11 @@ RUN bash -lc "source /opt/ros/kilted/setup.bash && colcon build --packages-selec
 FROM ros:kilted-ros-base AS runtime
 
 ENV ROS_DISTRO=kilted
+ENV RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 
 RUN apt-get update && apt-get install -y \
     libgpiod2 \
+    ros-kilted-rmw-cyclonedds-cpp \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /ws/install/spot_hcsr04_cpp /opt/spot_hcsr04_cpp

@@ -4,6 +4,7 @@
 #include <gpiod.h>
 
 #include <chrono>
+#include <cmath>
 #include <cstdlib>
 #include <limits>
 #include <sstream>
@@ -47,6 +48,27 @@ std::vector<std::string> sensors_from_env_or_default() {
   return split(s, ',');
 }
 
+enum class MeasureStatus : uint8_t {
+  OK = 0,
+  ECHO_READ_ERROR,
+  RISE_TIMEOUT,
+  FALL_TIMEOUT,
+};
+
+const char *status_str(const MeasureStatus s) {
+  switch (s) {
+    case MeasureStatus::OK:
+      return "ok";
+    case MeasureStatus::ECHO_READ_ERROR:
+      return "echo_read_error";
+    case MeasureStatus::RISE_TIMEOUT:
+      return "rise_timeout";
+    case MeasureStatus::FALL_TIMEOUT:
+      return "fall_timeout";
+  }
+  return "unknown";
+}
+
 }  // namespace
 
 struct HCSensor {
@@ -60,14 +82,24 @@ struct HCSensor {
   rclcpp::Publisher<sensor_msgs::msg::Range>::SharedPtr pub;
   sensor_msgs::msg::Range msg;
 
+  // Runtime state (for periodic logs)
+  uint64_t measurement_count = 0;
   uint64_t timeout_count = 0;
+  uint64_t last_measurement_count_logged = 0;
+  uint64_t last_timeout_count_logged = 0;
+
+  float last_distance_m = std::numeric_limits<float>::quiet_NaN();
+  int64_t last_pulse_us = -1;
+  MeasureStatus last_status = MeasureStatus::ECHO_READ_ERROR;
+  rclcpp::Time last_stamp;
 };
 
 class HCSr04Node final : public rclcpp::Node {
  public:
   HCSr04Node() : Node("hcsr04_node") {
     const auto default_sensors = sensors_from_env_or_default();
-    const auto sensor_config = declare_parameter<std::vector<std::string>>("sensors", default_sensors);
+    const auto sensor_config =
+        declare_parameter<std::vector<std::string>>("sensors", default_sensors);
 
     // Open GPIO chip
     chip_ = gpiod_chip_open_by_name("gpiochip0");
@@ -80,7 +112,9 @@ class HCSr04Node final : public rclcpp::Node {
     for (const auto &cfg : sensor_config) {
       auto parts = split(cfg, ':');
       if (parts.size() != 3) {
-        RCLCPP_ERROR(get_logger(), "Invalid sensor spec '%s' (expected name:TRIG:echo)", cfg.c_str());
+        RCLCPP_ERROR(get_logger(),
+                     "Invalid sensor spec '%s' (expected name:TRIG:echo)",
+                     cfg.c_str());
         continue;
       }
 
@@ -92,28 +126,35 @@ class HCSr04Node final : public rclcpp::Node {
       sensor.trig_line = gpiod_chip_get_line(chip_, sensor.trig_pin);
       sensor.echo_line = gpiod_chip_get_line(chip_, sensor.echo_pin);
       if (!sensor.trig_line || !sensor.echo_line) {
-        RCLCPP_ERROR(get_logger(), "Failed to get GPIO lines for %s (TRIG=%d, ECHO=%d)", sensor.name.c_str(),
-                     sensor.trig_pin, sensor.echo_pin);
+        RCLCPP_ERROR(get_logger(),
+                     "Failed to get GPIO lines for %s (TRIG=%d, ECHO=%d)",
+                     sensor.name.c_str(), sensor.trig_pin, sensor.echo_pin);
         continue;
       }
 
       if (gpiod_line_request_output(sensor.trig_line, "hcsr04_trig", 0) < 0) {
-        RCLCPP_ERROR(get_logger(), "Failed to request output access for TRIG (%s)", sensor.name.c_str());
+        RCLCPP_ERROR(get_logger(),
+                     "Failed to request output access for TRIG (%s)",
+                     sensor.name.c_str());
         gpiod_line_release(sensor.trig_line);
         gpiod_line_release(sensor.echo_line);
         continue;
       }
 
       if (gpiod_line_request_input(sensor.echo_line, "hcsr04_echo") < 0) {
-        RCLCPP_ERROR(get_logger(), "Failed to request input access for ECHO (%s)", sensor.name.c_str());
+        RCLCPP_ERROR(get_logger(),
+                     "Failed to request input access for ECHO (%s)",
+                     sensor.name.c_str());
         gpiod_line_release(sensor.trig_line);
         gpiod_line_release(sensor.echo_line);
         continue;
       }
 
       // Create publisher
-      const auto topic_name = "/spot/sensor/ultrasonic/" + sensor.name + "/range";
-      sensor.pub = create_publisher<sensor_msgs::msg::Range>(topic_name, 10);
+      const auto topic_name = "/spot/sensor/ultrasonic/" + sensor.name +
+                              "/range";
+      sensor.pub =
+          create_publisher<sensor_msgs::msg::Range>(topic_name, 10);
 
       // Setup Range message
       sensor.msg.header.frame_id = "ultrasonic_" + sensor.name;
@@ -123,12 +164,18 @@ class HCSr04Node final : public rclcpp::Node {
       sensor.msg.max_range = 4.0f;
 
       sensors_.push_back(std::move(sensor));
-      RCLCPP_INFO(get_logger(), "Initialized sensor: %s (TRIG=%d, ECHO=%d)", sensors_.back().name.c_str(),
-                  sensors_.back().trig_pin, sensors_.back().echo_pin);
+      RCLCPP_INFO(get_logger(), "Initialized sensor: %s (TRIG=%d, ECHO=%d)",
+                  sensors_.back().name.c_str(), sensors_.back().trig_pin,
+                  sensors_.back().echo_pin);
     }
 
     // Timer for measurements (staggered across sensors)
-    timer_ = create_wall_timer(100ms, std::bind(&HCSr04Node::measure_callback, this));
+    timer_ = create_wall_timer(100ms,
+                               std::bind(&HCSr04Node::measure_callback, this));
+
+    // Periodic status logs (at least once per minute)
+    status_timer_ = create_wall_timer(
+        60s, std::bind(&HCSr04Node::status_callback, this));
   }
 
   ~HCSr04Node() override {
@@ -145,16 +192,68 @@ class HCSr04Node final : public rclcpp::Node {
     if (sensors_.empty()) return;
 
     auto &sensor = sensors_[sensor_idx];
+
     const float distance_m = measure_distance(sensor);
 
-    sensor.msg.header.stamp = this->now();
+    const auto stamp = this->now();
+    sensor.measurement_count++;
+    sensor.last_distance_m = distance_m;
+    sensor.last_stamp = stamp;
+
+    sensor.msg.header.stamp = stamp;
     sensor.msg.range = distance_m;
     sensor.pub->publish(sensor.msg);
 
     sensor_idx = (sensor_idx + 1) % sensors_.size();
   }
 
+  void status_callback() {
+    if (sensors_.empty()) return;
+
+    for (auto &s : sensors_) {
+      const uint64_t meas_delta = s.measurement_count - s.last_measurement_count_logged;
+      const uint64_t to_delta = s.timeout_count - s.last_timeout_count_logged;
+
+      const bool have_stamp = (s.last_stamp.nanoseconds() != 0);
+      const int64_t age_ms = have_stamp
+                                 ? (this->now() - s.last_stamp).nanoseconds() /
+                                       1000000
+                                 : -1;
+
+      if (std::isnan(s.last_distance_m)) {
+        RCLCPP_INFO(get_logger(),
+                    "%s: TRIG=%d ECHO=%d dist=nan pulse_us=%ld status=%s "
+                    "meas=%lu (+%lu/min) timeouts=%lu (+%lu/min) age_ms=%ld",
+                    s.name.c_str(), s.trig_pin, s.echo_pin,
+                    static_cast<long>(s.last_pulse_us), status_str(s.last_status),
+                    static_cast<unsigned long>(s.measurement_count),
+                    static_cast<unsigned long>(meas_delta),
+                    static_cast<unsigned long>(s.timeout_count),
+                    static_cast<unsigned long>(to_delta),
+                    static_cast<long>(age_ms));
+      } else {
+        const double dist_cm = static_cast<double>(s.last_distance_m) * 100.0;
+        RCLCPP_INFO(get_logger(),
+                    "%s: TRIG=%d ECHO=%d dist=%.3fm(%.1fcm) pulse_us=%ld status=%s "
+                    "meas=%lu (+%lu/min) timeouts=%lu (+%lu/min) age_ms=%ld",
+                    s.name.c_str(), s.trig_pin, s.echo_pin,
+                    static_cast<double>(s.last_distance_m), dist_cm,
+                    static_cast<long>(s.last_pulse_us), status_str(s.last_status),
+                    static_cast<unsigned long>(s.measurement_count),
+                    static_cast<unsigned long>(meas_delta),
+                    static_cast<unsigned long>(s.timeout_count),
+                    static_cast<unsigned long>(to_delta),
+                    static_cast<long>(age_ms));
+      }
+
+      s.last_measurement_count_logged = s.measurement_count;
+      s.last_timeout_count_logged = s.timeout_count;
+    }
+  }
+
   float measure_distance(HCSensor &sensor) {
+    sensor.last_pulse_us = -1;
+
     // Trigger pulse (10us)
     (void)gpiod_line_set_value(sensor.trig_line, 0);
     usleep(2);
@@ -169,14 +268,19 @@ class HCSr04Node final : public rclcpp::Node {
     while (true) {
       const int v = gpiod_line_get_value(sensor.echo_line);
       if (v < 0) {
-        RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 5000, "%s: ECHO read error", sensor.name.c_str());
+        sensor.last_status = MeasureStatus::ECHO_READ_ERROR;
+        RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 5000,
+                             "%s: ECHO read error", sensor.name.c_str());
         return sensor.msg.max_range;
       }
       if (v == 1) break;
       if (std::chrono::steady_clock::now() - t0 > timeout) {
         sensor.timeout_count++;
-        RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 5000, "%s: rise timeout (count=%lu)",
-                             sensor.name.c_str(), static_cast<unsigned long>(sensor.timeout_count));
+        sensor.last_status = MeasureStatus::RISE_TIMEOUT;
+        RCLCPP_WARN_THROTTLE(
+            get_logger(), *get_clock(), 5000,
+            "%s: rise timeout (count=%lu)", sensor.name.c_str(),
+            static_cast<unsigned long>(sensor.timeout_count));
         return sensor.msg.max_range;
       }
       usleep(1);
@@ -186,14 +290,19 @@ class HCSr04Node final : public rclcpp::Node {
     while (true) {
       const int v = gpiod_line_get_value(sensor.echo_line);
       if (v < 0) {
-        RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 5000, "%s: ECHO read error", sensor.name.c_str());
+        sensor.last_status = MeasureStatus::ECHO_READ_ERROR;
+        RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 5000,
+                             "%s: ECHO read error", sensor.name.c_str());
         return sensor.msg.max_range;
       }
       if (v == 0) break;
       if (std::chrono::steady_clock::now() - t_rise > timeout) {
         sensor.timeout_count++;
-        RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 5000, "%s: fall timeout (count=%lu)",
-                             sensor.name.c_str(), static_cast<unsigned long>(sensor.timeout_count));
+        sensor.last_status = MeasureStatus::FALL_TIMEOUT;
+        RCLCPP_WARN_THROTTLE(
+            get_logger(), *get_clock(), 5000,
+            "%s: fall timeout (count=%lu)", sensor.name.c_str(),
+            static_cast<unsigned long>(sensor.timeout_count));
         return sensor.msg.max_range;
       }
       usleep(1);
@@ -201,10 +310,15 @@ class HCSr04Node final : public rclcpp::Node {
 
     const auto t_fall = std::chrono::steady_clock::now();
     const auto pulse_us =
-        std::chrono::duration_cast<std::chrono::microseconds>(t_fall - t_rise).count();
+        std::chrono::duration_cast<std::chrono::microseconds>(t_fall - t_rise)
+            .count();
+
+    sensor.last_pulse_us = pulse_us;
+    sensor.last_status = MeasureStatus::OK;
 
     // Speed of sound approx 343 m/s at 20°C.
-    const double distance_m = (static_cast<double>(pulse_us) * 1e-6 * 343.0) / 2.0;
+    const double distance_m = (static_cast<double>(pulse_us) * 1e-6 * 343.0) /
+                              2.0;
 
     if (distance_m < sensor.msg.min_range) return sensor.msg.min_range;
     if (distance_m > sensor.msg.max_range) return sensor.msg.max_range;
@@ -214,6 +328,7 @@ class HCSr04Node final : public rclcpp::Node {
   struct gpiod_chip *chip_ = nullptr;
   std::vector<HCSensor> sensors_;
   rclcpp::TimerBase::SharedPtr timer_;
+  rclcpp::TimerBase::SharedPtr status_timer_;
 };
 
 int main(int argc, char **argv) {
