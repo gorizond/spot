@@ -98,7 +98,7 @@ public:
                 HandlePayload(msg->data, config_.lcd.uptime_line, 0, 8);
             });
 
-        RCLCPP_INFO(this->get_logger(), "LCD Node initialized");
+        RCLCPP_INFO(this->get_logger(), "LCD Node initialized (refresh_interval=%ds)", config_.lcd.refresh_interval);
     }
 
 private:

@@ -22,12 +22,14 @@ DisplayService::~DisplayService() {
 void DisplayService::startDisplayLoop() {
     running_ = true;
     display_thread_ = std::thread([this]() {
+        const int refresh_interval = std::max(1, config_.refresh_interval);
+
         while (running_) {
-            std::this_thread::sleep_for(std::chrono::seconds(1));
-            
+            std::this_thread::sleep_for(std::chrono::seconds(refresh_interval));
+
             std::lock_guard<std::mutex> lock(*data_mutex_);
 
-            // Обновляем LCD дисплей каждую секунду
+            // Обновляем LCD дисплей по настраиваемому интервалу
             if (lcd_display_) {
                 lcd_display_->clear();
                 for (int i = 0; i < config_.rows; ++i) {

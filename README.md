@@ -22,6 +22,7 @@ The LCD service follows a modular ROS2 architecture with the following component
 
 - Written in C++ with ROS2 integration
 - Configurable via environment variables
+- LCD redraw interval is configurable via `LCD_REFRESH_INTERVAL` (seconds, default: `10`)
 - Dockerized with multistage build for minimal footprint
 - Kubernetes-ready deployment manifests
 - GPIO control for Raspberry Pi using libgpiod

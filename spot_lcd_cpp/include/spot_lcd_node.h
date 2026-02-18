@@ -20,6 +20,7 @@ struct LcdConfig {
     std::vector<int> pins_data = {23, 17, 18, 22};
     int cols = 16;
     int rows = 2;
+    int refresh_interval = 10; // seconds
     int temp_line = 0;   // 0-based line index for temperature
     int uptime_line = 1; // 0-based line index for uptime
 };

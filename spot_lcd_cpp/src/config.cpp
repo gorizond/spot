@@ -23,6 +23,10 @@ Config Config::fromEnv() {
     config.lcd.pin_en = readEnvInt("LCD_PIN_EN", config.lcd.pin_en);
     config.lcd.cols = readEnvInt("LCD_COLS", config.lcd.cols);
     config.lcd.rows = readEnvInt("LCD_ROWS", config.lcd.rows);
+    config.lcd.refresh_interval = readEnvInt("LCD_REFRESH_INTERVAL", config.lcd.refresh_interval);
+    if (config.lcd.refresh_interval <= 0) {
+        config.lcd.refresh_interval = 10;
+    }
 
     // Display line mapping (accepts 0-based or 1-based)
     config.lcd.temp_line = readEnvInt("LCD_TEMP_LINE", config.lcd.temp_line);

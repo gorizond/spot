@@ -5,6 +5,7 @@ pin_en = 24
 pins_data = [23, 17, 18, 22]
 cols = 16
 rows = 2
+refresh_interval = 10
 
 [temp_monitor]
 interval = 10
