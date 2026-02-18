@@ -27,5 +27,7 @@ RUN apt-get update && apt-get install -y \
 
 COPY --from=builder /ws/install/spot_hcsr04_cpp /opt/spot_hcsr04_cpp
 
-ENTRYPOINT ["bash", "-lc"]
-CMD ["source /opt/ros/kilted/setup.bash && source /opt/spot_hcsr04_cpp/share/spot_hcsr04_cpp/local_setup.bash && exec ros2 run spot_hcsr04_cpp hcsr04_node"]
+# Create run script
+RUN printf '#!/bin/bash\nset -e\nsource /opt/ros/kilted/setup.bash\nsource /opt/spot_hcsr04_cpp/share/spot_hcsr04_cpp/local_setup.bash\nexec ros2 run spot_hcsr04_cpp hcsr04_node\n' > /usr/local/bin/run_hcsr04_node.sh && chmod +x /usr/local/bin/run_hcsr04_node.sh
+
+ENTRYPOINT ["/usr/local/bin/run_hcsr04_node.sh"]
