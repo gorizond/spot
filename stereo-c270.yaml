@@ -168,13 +168,13 @@ data:
 
         image_qos = QoSProfile(
           history=HistoryPolicy.KEEP_LAST,
-          depth=10,
-          reliability=ReliabilityPolicy.RELIABLE,
+          depth=1,
+          reliability=ReliabilityPolicy.BEST_EFFORT,
           durability=DurabilityPolicy.VOLATILE,
         )
         camera_info_qos = QoSProfile(
           history=HistoryPolicy.KEEP_LAST,
-          depth=10,
+          depth=1,
           reliability=ReliabilityPolicy.RELIABLE,
           durability=DurabilityPolicy.VOLATILE,
         )
@@ -183,7 +183,7 @@ data:
         self._image_count = 0
         self._camera_info_in = 0
         self._camera_info_out = 0
-        self._latest_camera_info = None
+        self._camera_info_template = None
 
         self.create_subscription(CameraInfo, f'{base}/camera_info', self._on_camera_info, camera_info_qos)
         self.create_subscription(Image, f'{base}/image_raw', self._on_image, image_qos)
@@ -193,16 +193,19 @@ data:
         self.get_logger().info(f'camera_info restamp enabled for {base}')
 
       def _on_camera_info(self, msg: CameraInfo):
-        self._latest_camera_info = msg
         self._camera_info_in += 1
+        if self._camera_info_template is None:
+          self._camera_info_template = copy.deepcopy(msg)
+          self.get_logger().info(f'[{self._side}] camera_info template captured')
 
       def _on_image(self, msg: Image):
         self._image_count += 1
-        if self._latest_camera_info is None:
+        if self._camera_info_template is None:
           return
 
-        out = copy.deepcopy(self._latest_camera_info)
+        out = copy.deepcopy(self._camera_info_template)
         out.header.stamp = msg.header.stamp
+        out.header.frame_id = msg.header.frame_id
         self._pub.publish(out)
         self._camera_info_out += 1
 
