@@ -66,20 +66,33 @@ data:
 
     resolve_video_device() {
       local dev="$1"
-      local resolved
+      local target
+      local candidate
+      local video
 
-      resolved="$(readlink -f "${dev}" 2>/dev/null || true)"
-      if [ -n "${resolved}" ]; then
-        dev="${resolved}"
+      if [ -L "${dev}" ]; then
+        target="$(readlink "${dev}" 2>/dev/null || true)"
+        video="$(echo "${target}" | grep -oE 'video[0-9]+' | head -n1 || true)"
+        if [ -n "${video}" ]; then
+          echo "/dev/${video}"
+          return 0
+        fi
       fi
 
-      case "${dev}" in
+      candidate="$(readlink -f "${dev}" 2>/dev/null || echo "${dev}")"
+      video="$(echo "${candidate}" | grep -oE 'video[0-9]+' | head -n1 || true)"
+      if [ -n "${video}" ]; then
+        echo "/dev/${video}"
+        return 0
+      fi
+
+      case "${candidate}" in
         /host-dev/*)
-          dev="/dev/${dev#/host-dev/}"
+          candidate="/dev/${candidate#/host-dev/}"
           ;;
       esac
 
-      echo "${dev}"
+      echo "${candidate}"
     }
 
     LEFT_VIDEO_DEVICE_RESOLVED="$(resolve_video_device "${LEFT_VIDEO_DEVICE}")"
