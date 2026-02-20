@@ -518,6 +518,13 @@ spec:
             - |
               set -eo pipefail
               /config/run-left.sh
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "192Mi"
+            limits:
+              cpu: "900m"
+              memory: "512Mi"
           volumeMounts:
             - name: host-dev
               mountPath: /host-dev
@@ -576,6 +583,13 @@ spec:
             - |
               set -eo pipefail
               /config/run-right.sh
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "192Mi"
+            limits:
+              cpu: "900m"
+              memory: "512Mi"
           volumeMounts:
             - name: host-dev
               mountPath: /host-dev
@@ -638,6 +652,13 @@ spec:
             - |
               set -eo pipefail
               /config/run-stereo-core.sh
+          resources:
+            requests:
+              cpu: "400m"
+              memory: "384Mi"
+            limits:
+              cpu: "1800m"
+              memory: "1Gi"
           volumeMounts:
             - name: stereo-config
               mountPath: /config

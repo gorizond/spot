@@ -207,6 +207,13 @@ spec:
               echo b >/proc/sysrq-trigger || true
 
               sleep infinity
+          resources:
+            requests:
+              cpu: "25m"
+              memory: "64Mi"
+            limits:
+              cpu: "150m"
+              memory: "128Mi"
           volumeMounts:
             - name: host-boot
               mountPath: /host-boot

@@ -37,6 +37,13 @@ spec:
               value: "front_left:5:12,front_right:6:13"
             - name: RMW_IMPLEMENTATION
               value: "rmw_cyclonedds_cpp"
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "400m"
+              memory: "256Mi"
           volumeMounts:
             - name: gpiochip0
               mountPath: /dev/gpiochip0

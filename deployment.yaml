@@ -76,6 +76,13 @@ spec:
               source /opt/ros/kilted/setup.bash
               source /opt/spot_node_label_config_cpp/share/spot_node_label_config_cpp/local_setup.bash
               exec ros2 run spot_node_label_config_cpp spot_node_label_config_cpp_node
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "96Mi"
+            limits:
+              cpu: "200m"
+              memory: "192Mi"
           volumeMounts: []
         - name: servo-driver
           image: ghcr.io/gorizond/spot-servo-driver-cpp:latest
@@ -115,6 +122,13 @@ spec:
               source /opt/ros/kilted/setup.bash
               source /opt/spot_servo_driver_cpp/share/spot_servo_driver_cpp/local_setup.bash
               exec ros2 run spot_servo_driver_cpp spot_servo_driver_cpp_node
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "400m"
+              memory: "256Mi"
           volumeMounts:
             - name: i2c-1
               mountPath: /dev/i2c-1
@@ -145,6 +159,13 @@ spec:
               source /opt/ros/kilted/setup.bash
               source /opt/spot_cmd_mux_cpp/share/spot_cmd_mux_cpp/local_setup.bash
               exec ros2 run spot_cmd_mux_cpp spot_cmd_mux_cpp_node
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "96Mi"
+            limits:
+              cpu: "200m"
+              memory: "192Mi"
           volumeMounts: []
       volumes:
         - name: spot-node-label-config
@@ -215,6 +236,13 @@ spec:
                 links_map_path:=/opt/spot/champ/links_ros2.yaml \
                 gait_config_path:=/opt/spot/champ/gait_ros2.yaml \
                 publish_joint_states:=true publish_joint_control:=false
+          resources:
+            requests:
+              cpu: "300m"
+              memory: "384Mi"
+            limits:
+              cpu: "1500m"
+              memory: "1Gi"
           volumeMounts:
             - name: spot-node-label-config
               mountPath: /opt/spot
@@ -256,6 +284,13 @@ spec:
               source /opt/ros/kilted/setup.bash
               source /opt/spot_champ_bridge_cpp/share/spot_champ_bridge_cpp/local_setup.bash
               exec ros2 run spot_champ_bridge_cpp spot_champ_bridge_cpp_node
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "400m"
+              memory: "256Mi"
           volumeMounts: []
       volumes:
         - name: spot-node-label-config

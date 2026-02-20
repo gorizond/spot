@@ -68,6 +68,13 @@ spec:
               value: "0"
             - name: LCD_UPTIME_LINE
               value: "1"
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "350m"
+              memory: "256Mi"
           volumeMounts:
             - name: spot-lcd-cpp-config-volume
               mountPath: /app/config
@@ -143,6 +150,13 @@ spec:
               value: "0"
             - name: TEMP_PUB_WIDTH
               value: "8"
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "96Mi"
+            limits:
+              cpu: "200m"
+              memory: "192Mi"
           volumeMounts:
             - name: spot-lcd-cpp-config-volume
               mountPath: /app/config
@@ -199,6 +213,13 @@ spec:
               value: "0"
             - name: UPTIME_PUB_WIDTH
               value: "8"
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "96Mi"
+            limits:
+              cpu: "200m"
+              memory: "192Mi"
           volumeMounts:
             - name: spot-lcd-cpp-config-volume
               mountPath: /app/config
