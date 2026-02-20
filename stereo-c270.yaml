@@ -154,7 +154,7 @@ data:
     LEFT_VIDEO_DEVICE="${LEFT_VIDEO_DEVICE:-/host-dev/v4l/by-path/platform-fd500000.pcie-pci-0000:01:00.0-usb-0:1.1:1.0-video-index0}"
     RIGHT_VIDEO_DEVICE="${RIGHT_VIDEO_DEVICE:-/host-dev/v4l/by-path/platform-fd500000.pcie-pci-0000:01:00.0-usb-0:1.2:1.0-video-index0}"
     STEREO_NAMESPACE="${STEREO_NAMESPACE:-stereo}"
-    APPROX_SYNC_TOLERANCE="${APPROX_SYNC_TOLERANCE:-0.03}"
+    APPROX_SYNC_TOLERANCE="${APPROX_SYNC_TOLERANCE:-0.12}"
 
     echo "[spot-stereo-c270] LEFT_VIDEO_DEVICE=${LEFT_VIDEO_DEVICE}"
     echo "[spot-stereo-c270] RIGHT_VIDEO_DEVICE=${RIGHT_VIDEO_DEVICE}"
@@ -311,7 +311,7 @@ spec:
             - name: STEREO_NAMESPACE
               value: "stereo"
             - name: APPROX_SYNC_TOLERANCE
-              value: "0.03"
+              value: "0.12"
             - name: LEFT_VIDEO_DEVICE
               value: "/host-dev/v4l/by-path/platform-fd500000.pcie-pci-0000:01:00.0-usb-0:1.1:1.0-video-index0"
             - name: RIGHT_VIDEO_DEVICE
