@@ -145,6 +145,81 @@ data:
       - 1.0
       - 0.0
 
+  camera_info_restamp.py: |
+    #!/usr/bin/env python3
+    import argparse
+    import copy
+
+    import rclpy
+    from rclpy.node import Node
+    from sensor_msgs.msg import CameraInfo, Image
+
+
+    class CameraInfoRestamp(Node):
+      def __init__(self, namespace: str):
+        super().__init__('camera_info_restamp')
+        ns = namespace.strip('/')
+        self._sides = {
+          'left': {'last_image_stamp': None, 'image_count': 0, 'camera_info_in': 0, 'camera_info_out': 0},
+          'right': {'last_image_stamp': None, 'image_count': 0, 'camera_info_in': 0, 'camera_info_out': 0},
+        }
+
+        for side in ('left', 'right'):
+          base = f'/{ns}/{side}'
+          self.create_subscription(Image, f'{base}/image_raw', self._make_image_cb(side), 20)
+          self.create_subscription(CameraInfo, f'{base}/camera_info', self._make_ci_cb(side), 20)
+          self._sides[side]['pub'] = self.create_publisher(CameraInfo, f'{base}/camera_info_sync', 20)
+
+        self.create_timer(10.0, self._log_stats)
+        self.get_logger().info(f'camera_info restamp enabled for namespace=/{ns}')
+
+      def _make_image_cb(self, side):
+        def _cb(msg: Image):
+          st = self._sides[side]
+          st['last_image_stamp'] = msg.header.stamp
+          st['image_count'] += 1
+
+        return _cb
+
+      def _make_ci_cb(self, side):
+        def _cb(msg: CameraInfo):
+          st = self._sides[side]
+          st['camera_info_in'] += 1
+
+          out = copy.deepcopy(msg)
+          if st['last_image_stamp'] is not None:
+            out.header.stamp = st['last_image_stamp']
+
+          st['pub'].publish(out)
+          st['camera_info_out'] += 1
+
+        return _cb
+
+      def _log_stats(self):
+        for side in ('left', 'right'):
+          st = self._sides[side]
+          self.get_logger().info(
+            f"[{side}] image={st['image_count']} ci_in={st['camera_info_in']} ci_out={st['camera_info_out']}"
+          )
+
+
+    def main():
+      parser = argparse.ArgumentParser()
+      parser.add_argument('--namespace', default='stereo')
+      args = parser.parse_args()
+
+      rclpy.init()
+      node = CameraInfoRestamp(args.namespace)
+      try:
+        rclpy.spin(node)
+      finally:
+        node.destroy_node()
+        rclpy.shutdown()
+
+
+    if __name__ == '__main__':
+      main()
+
   run-left.sh: |
     #!/usr/bin/env bash
     set -eo pipefail
@@ -328,8 +403,8 @@ data:
     source /opt/ros/kilted/setup.bash
 
     STEREO_NAMESPACE="${STEREO_NAMESPACE:-stereo}"
-    APPROX_SYNC_TOLERANCE="${APPROX_SYNC_TOLERANCE:-0.12}"
-    POINTCLOUD_SYNC_TOLERANCE="${POINTCLOUD_SYNC_TOLERANCE:-20.0}"
+    APPROX_SYNC_TOLERANCE="${APPROX_SYNC_TOLERANCE:-0.35}"
+    POINTCLOUD_SYNC_TOLERANCE="${POINTCLOUD_SYNC_TOLERANCE:-0.35}"
     DISPARITY_RANGE="${DISPARITY_RANGE:-192}"
 
     echo "[spot-stereo-c270-core] STEREO_NAMESPACE=${STEREO_NAMESPACE}"
@@ -344,9 +419,29 @@ data:
       PIDS+=("$!")
     }
 
-    start_bg ros2 run stereo_image_proc disparity_node --ros-args       --remap __ns:=/${STEREO_NAMESPACE}       -p approximate_sync:=true       -p approximate_sync_tolerance_seconds:=${APPROX_SYNC_TOLERANCE}       -p disparity_range:=${DISPARITY_RANGE}       --remap left/camera_info:=/${STEREO_NAMESPACE}/left/camera_info       --remap right/camera_info:=/${STEREO_NAMESPACE}/right/camera_info       --remap left/image_rect:=/${STEREO_NAMESPACE}/left/image_raw       --remap right/image_rect:=/${STEREO_NAMESPACE}/right/image_raw
+    start_bg python3 /config/camera_info_restamp.py --namespace "${STEREO_NAMESPACE}"
 
-    start_bg ros2 run stereo_image_proc point_cloud_node --ros-args       --remap __ns:=/${STEREO_NAMESPACE}       -p approximate_sync:=true       -p approximate_sync_tolerance_seconds:=${POINTCLOUD_SYNC_TOLERANCE}       -p avoid_point_cloud_padding:=true       --remap disparity:=/${STEREO_NAMESPACE}/disparity       --remap left/camera_info:=/${STEREO_NAMESPACE}/left/camera_info       --remap right/camera_info:=/${STEREO_NAMESPACE}/right/camera_info       --remap left/image_rect_color:=/${STEREO_NAMESPACE}/left/image_raw
+    start_bg ros2 run stereo_image_proc disparity_node --ros-args \
+      --remap __ns:=/${STEREO_NAMESPACE} \
+      -p approximate_sync:=true \
+      -p approximate_sync_tolerance_seconds:=${APPROX_SYNC_TOLERANCE} \
+      -p queue_size:=20 \
+      -p disparity_range:=${DISPARITY_RANGE} \
+      --remap left/camera_info:=/${STEREO_NAMESPACE}/left/camera_info_sync \
+      --remap right/camera_info:=/${STEREO_NAMESPACE}/right/camera_info_sync \
+      --remap left/image_rect:=/${STEREO_NAMESPACE}/left/image_raw \
+      --remap right/image_rect:=/${STEREO_NAMESPACE}/right/image_raw
+
+    start_bg ros2 run stereo_image_proc point_cloud_node --ros-args \
+      --remap __ns:=/${STEREO_NAMESPACE} \
+      -p approximate_sync:=true \
+      -p approximate_sync_tolerance_seconds:=${POINTCLOUD_SYNC_TOLERANCE} \
+      -p queue_size:=20 \
+      -p avoid_point_cloud_padding:=true \
+      --remap disparity:=/${STEREO_NAMESPACE}/disparity \
+      --remap left/camera_info:=/${STEREO_NAMESPACE}/left/camera_info_sync \
+      --remap right/camera_info:=/${STEREO_NAMESPACE}/right/camera_info_sync \
+      --remap left/image_rect_color:=/${STEREO_NAMESPACE}/left/image_raw
 
     cleanup() {
       kill "${PIDS[@]}" 2>/dev/null || true
@@ -509,9 +604,9 @@ spec:
             - name: STEREO_NAMESPACE
               value: "stereo"
             - name: APPROX_SYNC_TOLERANCE
-              value: "20.0"
+              value: "0.35"
             - name: POINTCLOUD_SYNC_TOLERANCE
-              value: "20.0"
+              value: "0.35"
             - name: DISPARITY_RANGE
               value: "192"
           command: ["bash", "-lc"]
