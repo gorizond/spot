@@ -33,7 +33,7 @@ data:
 
   run-stereo.sh: |
     #!/usr/bin/env bash
-    set -euo pipefail
+    set -eo pipefail
 
     source /opt/ros/kilted/setup.bash
 
@@ -165,7 +165,7 @@ spec:
           command: ["bash", "-lc"]
           args:
             - |
-              set -euo pipefail
+              set -eo pipefail
               /config/run-stereo.sh
           volumeMounts:
             - name: host-dev
