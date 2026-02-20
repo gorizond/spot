@@ -8,6 +8,7 @@ resources:
   - lcd.yaml
   - performance-setup.yaml
   - hcsr04.yaml
+  - stereo-c270.yaml
 
 configMapGenerator:
   - name: spot-node-label-config

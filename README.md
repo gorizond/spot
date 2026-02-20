@@ -148,6 +148,42 @@ Quick troubleshooting (field checklist):
 - Resolution: replacing the module restored stable measurements.
 - Related hardening: switched `spot-hcsr04` to `rmw_cyclonedds_cpp` and added minute-level status logging for easier diagnostics.
 
+## Stereo vision (2x Logitech C270 via USB)
+
+`spot-stereo-c270` is deployed via `stereo-c270.yaml` as a dedicated DaemonSet:
+
+- image: `ghcr.io/gorizond/spot-stereo-c270:latest`
+- runtime: ROS 2 Kilted (`usb_cam` + `stereo_image_proc`)
+- sync mode: `approximate_sync=true` (tolerance `0.03s` by default)
+- node label gate: `gorizond.io/spot-stereo=true`
+- DDS runtime: `RMW_IMPLEMENTATION=rmw_cyclonedds_cpp`
+
+Default video mapping on `spot-5` uses **stable by-path symlinks**:
+
+- left: `platform-fd500000.pcie-pci-0000:01:00.0-usb-0:1.2:1.0-video-index0`
+- right: `platform-fd500000.pcie-pci-0000:01:00.0-usb-0:1.1:1.0-video-index0`
+
+Important: for two identical C270 webcams, `by-id` may collide (same serial), so `by-path` is preferred.
+
+Published topics (namespace `stereo`):
+
+- `/stereo/left/image_raw`, `/stereo/right/image_raw`
+- `/stereo/left/image_rect`, `/stereo/right/image_rect`
+- `/stereo/disparity`
+- `/stereo/points2`
+
+Quick enable on robot node:
+
+```bash
+kubectl label node spot-5 gorizond.io/spot-stereo=true --overwrite
+```
+
+Notes:
+
+- Physical setup baseline `8.5 cm` with both cameras rotated equally (portrait) is supported.
+- After any mechanical change (baseline/rotation), redo stereo calibration.
+- `usb_cam` configs are embedded in `spot-stereo-c270-config`; tweak resolution/FPS there.
+
 ## What runs
 
 `deployment.yaml` deploys two DaemonSets (one pod per robot node):

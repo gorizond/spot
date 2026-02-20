@@ -1,0 +1,184 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: spot-stereo-c270-config
+data:
+  usb_cam_left.yaml: |
+    /**:
+      ros__parameters:
+        video_device: "__LEFT_VIDEO_DEVICE__"
+        framerate: 15.0
+        io_method: "mmap"
+        frame_id: "stereo_left_optical_frame"
+        pixel_format: "mjpeg2rgb"
+        av_device_format: "YUV422P"
+        image_width: 640
+        image_height: 480
+        camera_name: "stereo_left"
+        camera_info_url: ""
+
+  usb_cam_right.yaml: |
+    /**:
+      ros__parameters:
+        video_device: "__RIGHT_VIDEO_DEVICE__"
+        framerate: 15.0
+        io_method: "mmap"
+        frame_id: "stereo_right_optical_frame"
+        pixel_format: "mjpeg2rgb"
+        av_device_format: "YUV422P"
+        image_width: 640
+        image_height: 480
+        camera_name: "stereo_right"
+        camera_info_url: ""
+
+  run-stereo.sh: |
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    source /opt/ros/kilted/setup.bash
+
+    LEFT_VIDEO_DEVICE="${LEFT_VIDEO_DEVICE:-/host-dev/v4l/by-path/platform-fd500000.pcie-pci-0000:01:00.0-usb-0:1.2:1.0-video-index0}"
+    RIGHT_VIDEO_DEVICE="${RIGHT_VIDEO_DEVICE:-/host-dev/v4l/by-path/platform-fd500000.pcie-pci-0000:01:00.0-usb-0:1.1:1.0-video-index0}"
+    STEREO_NAMESPACE="${STEREO_NAMESPACE:-stereo}"
+    APPROX_SYNC_TOLERANCE="${APPROX_SYNC_TOLERANCE:-0.03}"
+
+    echo "[spot-stereo-c270] LEFT_VIDEO_DEVICE=${LEFT_VIDEO_DEVICE}"
+    echo "[spot-stereo-c270] RIGHT_VIDEO_DEVICE=${RIGHT_VIDEO_DEVICE}"
+    echo "[spot-stereo-c270] STEREO_NAMESPACE=${STEREO_NAMESPACE}"
+
+    wait_for_device() {
+      local dev="$1"
+      local retries="${2:-60}"
+
+      for _ in $(seq 1 "${retries}"); do
+        if [ -e "${dev}" ]; then
+          return 0
+        fi
+        sleep 1
+      done
+
+      echo "[spot-stereo-c270] ERROR: device not found: ${dev}" >&2
+      return 1
+    }
+
+    wait_for_device "${LEFT_VIDEO_DEVICE}"
+    wait_for_device "${RIGHT_VIDEO_DEVICE}"
+
+    mkdir -p /tmp/spot-stereo
+    cp /config/usb_cam_left.yaml /tmp/spot-stereo/usb_cam_left.yaml
+    cp /config/usb_cam_right.yaml /tmp/spot-stereo/usb_cam_right.yaml
+
+    sed -i "s|__LEFT_VIDEO_DEVICE__|${LEFT_VIDEO_DEVICE}|g" /tmp/spot-stereo/usb_cam_left.yaml
+    sed -i "s|__RIGHT_VIDEO_DEVICE__|${RIGHT_VIDEO_DEVICE}|g" /tmp/spot-stereo/usb_cam_right.yaml
+
+    PIDS=()
+
+    start_bg() {
+      "$@" &
+      PIDS+=("$!")
+    }
+
+    start_bg ros2 run usb_cam usb_cam_node_exe \
+      --ros-args \
+      --remap __ns:=/${STEREO_NAMESPACE}/left \
+      --params-file /tmp/spot-stereo/usb_cam_left.yaml
+
+    start_bg ros2 run usb_cam usb_cam_node_exe \
+      --ros-args \
+      --remap __ns:=/${STEREO_NAMESPACE}/right \
+      --params-file /tmp/spot-stereo/usb_cam_right.yaml
+
+    start_bg ros2 launch image_proc image_proc.launch.py \
+      namespace:=${STEREO_NAMESPACE}/left
+
+    start_bg ros2 launch image_proc image_proc.launch.py \
+      namespace:=${STEREO_NAMESPACE}/right
+
+    start_bg ros2 run stereo_image_proc disparity_node --ros-args \
+      --remap __ns:=/${STEREO_NAMESPACE} \
+      -p approximate_sync:=true \
+      -p approximate_sync_tolerance_seconds:=${APPROX_SYNC_TOLERANCE} \
+      --remap left/camera_info:=/${STEREO_NAMESPACE}/left/camera_info \
+      --remap right/camera_info:=/${STEREO_NAMESPACE}/right/camera_info \
+      --remap left/image_rect:=/${STEREO_NAMESPACE}/left/image_rect \
+      --remap right/image_rect:=/${STEREO_NAMESPACE}/right/image_rect
+
+    start_bg ros2 run stereo_image_proc point_cloud_node --ros-args \
+      --remap __ns:=/${STEREO_NAMESPACE} \
+      -p approximate_sync:=true \
+      -p avoid_point_cloud_padding:=true \
+      --remap disparity:=/${STEREO_NAMESPACE}/disparity \
+      --remap left/camera_info:=/${STEREO_NAMESPACE}/left/camera_info \
+      --remap right/camera_info:=/${STEREO_NAMESPACE}/right/camera_info \
+      --remap left/image_rect_color:=/${STEREO_NAMESPACE}/left/image_rect_color
+
+    cleanup() {
+      kill "${PIDS[@]}" 2>/dev/null || true
+      wait "${PIDS[@]}" 2>/dev/null || true
+    }
+    trap cleanup EXIT INT TERM
+
+    wait -n "${PIDS[@]}"
+    exit $?
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: spot-stereo-c270
+  labels:
+    app.kubernetes.io/name: spot-stereo-c270
+    app.kubernetes.io/part-of: spot
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: spot-stereo-c270
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: spot-stereo-c270
+        app.kubernetes.io/part-of: spot
+    spec:
+      nodeSelector:
+        kubernetes.io/arch: arm64
+        gorizond.io/robot: "true"
+        gorizond.io/spot-stereo: "true"
+      containers:
+        - name: stereo-c270
+          image: ghcr.io/gorizond/spot-stereo-c270:latest
+          imagePullPolicy: Always
+          securityContext:
+            privileged: true
+            runAsUser: 0
+            runAsGroup: 0
+            allowPrivilegeEscalation: true
+          env:
+            - name: RMW_IMPLEMENTATION
+              value: "rmw_cyclonedds_cpp"
+            - name: STEREO_NAMESPACE
+              value: "stereo"
+            - name: APPROX_SYNC_TOLERANCE
+              value: "0.03"
+            - name: LEFT_VIDEO_DEVICE
+              value: "/host-dev/v4l/by-path/platform-fd500000.pcie-pci-0000:01:00.0-usb-0:1.2:1.0-video-index0"
+            - name: RIGHT_VIDEO_DEVICE
+              value: "/host-dev/v4l/by-path/platform-fd500000.pcie-pci-0000:01:00.0-usb-0:1.1:1.0-video-index0"
+          command: ["bash", "-lc"]
+          args:
+            - |
+              set -euo pipefail
+              /config/run-stereo.sh
+          volumeMounts:
+            - name: host-dev
+              mountPath: /host-dev
+            - name: stereo-config
+              mountPath: /config
+              readOnly: true
+      volumes:
+        - name: host-dev
+          hostPath:
+            path: /dev
+            type: Directory
+        - name: stereo-config
+          configMap:
+            name: spot-stereo-c270-config
+            defaultMode: 0555
