@@ -169,7 +169,7 @@ data:
         image_qos = QoSProfile(
           history=HistoryPolicy.KEEP_LAST,
           depth=1,
-          reliability=ReliabilityPolicy.BEST_EFFORT,
+          reliability=ReliabilityPolicy.RELIABLE,
           durability=DurabilityPolicy.VOLATILE,
         )
         camera_info_qos = QoSProfile(
