@@ -152,6 +152,7 @@ data:
 
     import rclpy
     from rclpy.node import Node
+    from rclpy.qos import DurabilityPolicy, HistoryPolicy, QoSProfile, ReliabilityPolicy
     from sensor_msgs.msg import CameraInfo, Image
 
 
@@ -159,6 +160,20 @@ data:
       def __init__(self, namespace: str):
         super().__init__('camera_info_restamp')
         ns = namespace.strip('/')
+
+        image_qos = QoSProfile(
+          history=HistoryPolicy.KEEP_LAST,
+          depth=1,
+          reliability=ReliabilityPolicy.BEST_EFFORT,
+          durability=DurabilityPolicy.VOLATILE,
+        )
+        camera_info_qos = QoSProfile(
+          history=HistoryPolicy.KEEP_LAST,
+          depth=5,
+          reliability=ReliabilityPolicy.BEST_EFFORT,
+          durability=DurabilityPolicy.VOLATILE,
+        )
+
         self._sides = {
           'left': {'last_image_stamp': None, 'image_count': 0, 'camera_info_in': 0, 'camera_info_out': 0},
           'right': {'last_image_stamp': None, 'image_count': 0, 'camera_info_in': 0, 'camera_info_out': 0},
@@ -166,9 +181,9 @@ data:
 
         for side in ('left', 'right'):
           base = f'/{ns}/{side}'
-          self.create_subscription(Image, f'{base}/image_raw', self._make_image_cb(side), 20)
-          self.create_subscription(CameraInfo, f'{base}/camera_info', self._make_ci_cb(side), 20)
-          self._sides[side]['pub'] = self.create_publisher(CameraInfo, f'{base}/camera_info_sync', 20)
+          self.create_subscription(Image, f'{base}/image_raw', self._make_image_cb(side), image_qos)
+          self.create_subscription(CameraInfo, f'{base}/camera_info', self._make_ci_cb(side), camera_info_qos)
+          self._sides[side]['pub'] = self.create_publisher(CameraInfo, f'{base}/camera_info_sync', camera_info_qos)
 
         self.create_timer(10.0, self._log_stats)
         self.get_logger().info(f'camera_info restamp enabled for namespace=/{ns}')
@@ -186,10 +201,11 @@ data:
           st = self._sides[side]
           st['camera_info_in'] += 1
 
-          out = copy.deepcopy(msg)
-          if st['last_image_stamp'] is not None:
-            out.header.stamp = st['last_image_stamp']
+          if st['last_image_stamp'] is None:
+            return
 
+          out = copy.deepcopy(msg)
+          out.header.stamp = st['last_image_stamp']
           st['pub'].publish(out)
           st['camera_info_out'] += 1
 
@@ -219,7 +235,6 @@ data:
 
     if __name__ == '__main__':
       main()
-
   run-left.sh: |
     #!/usr/bin/env bash
     set -eo pipefail
