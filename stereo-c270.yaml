@@ -145,7 +145,7 @@ data:
       - 1.0
       - 0.0
 
-  camera_info_restamp.py: |
+  camera_info_restamp_side.py: |
     #!/usr/bin/env python3
     import argparse
     import copy
@@ -156,10 +156,15 @@ data:
     from sensor_msgs.msg import CameraInfo, Image
 
 
-    class CameraInfoRestamp(Node):
-      def __init__(self, namespace: str):
-        super().__init__('camera_info_restamp')
+    class CameraInfoRestampSide(Node):
+      def __init__(self, namespace: str, side: str):
+        super().__init__(f'camera_info_restamp_{side}')
         ns = namespace.strip('/')
+        side = side.strip('/').lower()
+        if side not in ('left', 'right'):
+          raise ValueError(f'unsupported side: {side}')
+
+        base = f'/{ns}/{side}'
 
         image_qos = QoSProfile(
           history=HistoryPolicy.KEEP_LAST,
@@ -167,71 +172,54 @@ data:
           reliability=ReliabilityPolicy.BEST_EFFORT,
           durability=DurabilityPolicy.VOLATILE,
         )
-        camera_info_sub_qos = QoSProfile(
-          history=HistoryPolicy.KEEP_LAST,
-          depth=5,
-          reliability=ReliabilityPolicy.BEST_EFFORT,
-          durability=DurabilityPolicy.VOLATILE,
-        )
-        camera_info_pub_qos = QoSProfile(
+        camera_info_qos = QoSProfile(
           history=HistoryPolicy.KEEP_LAST,
           depth=5,
           reliability=ReliabilityPolicy.RELIABLE,
           durability=DurabilityPolicy.VOLATILE,
         )
 
-        self._sides = {
-          'left': {'last_image_stamp': None, 'image_count': 0, 'camera_info_in': 0, 'camera_info_out': 0},
-          'right': {'last_image_stamp': None, 'image_count': 0, 'camera_info_in': 0, 'camera_info_out': 0},
-        }
+        self._side = side
+        self._last_image_stamp = None
+        self._image_count = 0
+        self._camera_info_in = 0
+        self._camera_info_out = 0
 
-        for side in ('left', 'right'):
-          base = f'/{ns}/{side}'
-          self.create_subscription(Image, f'{base}/image_raw', self._make_image_cb(side), image_qos)
-          self.create_subscription(CameraInfo, f'{base}/camera_info', self._make_ci_cb(side), camera_info_sub_qos)
-          self._sides[side]['pub'] = self.create_publisher(CameraInfo, f'{base}/camera_info_sync', camera_info_pub_qos)
+        self.create_subscription(Image, f'{base}/image_raw', self._on_image, image_qos)
+        self.create_subscription(CameraInfo, f'{base}/camera_info', self._on_camera_info, camera_info_qos)
+        self._pub = self.create_publisher(CameraInfo, f'{base}/camera_info_sync', camera_info_qos)
 
         self.create_timer(10.0, self._log_stats)
-        self.get_logger().info(f'camera_info restamp enabled for namespace=/{ns}')
+        self.get_logger().info(f'camera_info restamp enabled for {base}')
 
-      def _make_image_cb(self, side):
-        def _cb(msg: Image):
-          st = self._sides[side]
-          st['last_image_stamp'] = msg.header.stamp
-          st['image_count'] += 1
+      def _on_image(self, msg: Image):
+        self._last_image_stamp = msg.header.stamp
+        self._image_count += 1
 
-        return _cb
+      def _on_camera_info(self, msg: CameraInfo):
+        self._camera_info_in += 1
+        if self._last_image_stamp is None:
+          return
 
-      def _make_ci_cb(self, side):
-        def _cb(msg: CameraInfo):
-          st = self._sides[side]
-          st['camera_info_in'] += 1
-
-          if st['last_image_stamp'] is None:
-            return
-
-          out = copy.deepcopy(msg)
-          out.header.stamp = st['last_image_stamp']
-          st['pub'].publish(out)
-          st['camera_info_out'] += 1
-
-        return _cb
+        out = copy.deepcopy(msg)
+        out.header.stamp = self._last_image_stamp
+        self._pub.publish(out)
+        self._camera_info_out += 1
 
       def _log_stats(self):
-        for side in ('left', 'right'):
-          st = self._sides[side]
-          self.get_logger().info(
-            f"[{side}] image={st['image_count']} ci_in={st['camera_info_in']} ci_out={st['camera_info_out']}"
-          )
+        self.get_logger().info(
+          f"[{self._side}] image={self._image_count} ci_in={self._camera_info_in} ci_out={self._camera_info_out}"
+        )
 
 
     def main():
       parser = argparse.ArgumentParser()
       parser.add_argument('--namespace', default='stereo')
+      parser.add_argument('--side', required=True, choices=['left', 'right'])
       args = parser.parse_args()
 
       rclpy.init()
-      node = CameraInfoRestamp(args.namespace)
+      node = CameraInfoRestampSide(args.namespace, args.side)
       try:
         rclpy.spin(node)
       finally:
@@ -315,7 +303,14 @@ data:
       PIDS+=("$!")
     }
 
-    start_bg ros2 run usb_cam usb_cam_node_exe       --ros-args       --remap __ns:=/${STEREO_NAMESPACE}/left       --params-file /tmp/spot-stereo/usb_cam_left.yaml
+    start_bg ros2 run usb_cam usb_cam_node_exe \
+      --ros-args \
+      --remap __ns:=/${STEREO_NAMESPACE}/left \
+      --params-file /tmp/spot-stereo/usb_cam_left.yaml
+
+    start_bg python3 /config/camera_info_restamp_side.py \
+      --namespace "${STEREO_NAMESPACE}" \
+      --side left
 
     # image_proc stays disabled: rectification nodes require exact image/camera_info timestamp sync
     # that usb_cam does not guarantee for C270 in this setup; stereo core uses image_raw + approximate sync.
@@ -403,7 +398,14 @@ data:
       PIDS+=("$!")
     }
 
-    start_bg ros2 run usb_cam usb_cam_node_exe       --ros-args       --remap __ns:=/${STEREO_NAMESPACE}/right       --params-file /tmp/spot-stereo/usb_cam_right.yaml
+    start_bg ros2 run usb_cam usb_cam_node_exe \
+      --ros-args \
+      --remap __ns:=/${STEREO_NAMESPACE}/right \
+      --params-file /tmp/spot-stereo/usb_cam_right.yaml
+
+    start_bg python3 /config/camera_info_restamp_side.py \
+      --namespace "${STEREO_NAMESPACE}" \
+      --side right
 
     # image_proc stays disabled: rectification nodes require exact image/camera_info timestamp sync
     # that usb_cam does not guarantee for C270 in this setup; stereo core uses image_raw + approximate sync.
@@ -439,8 +441,6 @@ data:
       "$@" &
       PIDS+=("$!")
     }
-
-    start_bg python3 /config/camera_info_restamp.py --namespace "${STEREO_NAMESPACE}"
 
     start_bg ros2 run stereo_image_proc disparity_node --ros-args \
       --remap __ns:=/${STEREO_NAMESPACE} \
