@@ -15,7 +15,7 @@ data:
         image_width: 640
         image_height: 480
         camera_name: "stereo_left"
-        camera_info_url: ""
+        camera_info_url: "file:///config/stereo_left.yaml"
 
   usb_cam_right.yaml: |
     /**:
@@ -29,7 +29,121 @@ data:
         image_width: 640
         image_height: 480
         camera_name: "stereo_right"
-        camera_info_url: ""
+        camera_info_url: "file:///config/stereo_right.yaml"
+
+  stereo_left.yaml: |
+    image_width: 640
+    image_height: 480
+    camera_name: stereo_left
+    camera_matrix:
+      rows: 3
+      cols: 3
+      data:
+      - 720.4267073195819
+      - 0.0
+      - 315.7349686685138
+      - 0.0
+      - 719.9836035982173
+      - 256.6732661725091
+      - 0.0
+      - 0.0
+      - 1.0
+    distortion_model: plumb_bob
+    distortion_coefficients:
+      rows: 1
+      cols: 5
+      data:
+      - 0.005707010124622469
+      - 0.7630553645642908
+      - 0.006245505045239368
+      - -1.535213084607296e-05
+      - -1.7944341661022236
+    rectification_matrix:
+      rows: 3
+      cols: 3
+      data:
+      - 0.9997701355168741
+      - 0.015244185266465628
+      - -0.015076171401683422
+      - -0.014777107346441942
+      - 0.9994218020637954
+      - 0.030621865684959435
+      - 0.015534259784199448
+      - -0.030392044602455377
+      - 0.9994173354499307
+    projection_matrix:
+      rows: 3
+      cols: 4
+      data:
+      - 771.3400185619274
+      - 0.0
+      - 328.74793243408203
+      - 0.0
+      - 0.0
+      - 771.3400185619274
+      - 230.5443172454834
+      - 0.0
+      - 0.0
+      - 0.0
+      - 1.0
+      - 0.0
+
+  stereo_right.yaml: |
+    image_width: 640
+    image_height: 480
+    camera_name: stereo_right
+    camera_matrix:
+      rows: 3
+      cols: 3
+      data:
+      - 721.8051392933522
+      - 0.0
+      - 341.04480982066093
+      - 0.0
+      - 721.242556071498
+      - 255.58851005478834
+      - 0.0
+      - 0.0
+      - 1.0
+    distortion_model: plumb_bob
+    distortion_coefficients:
+      rows: 1
+      cols: 5
+      data:
+      - 0.0239595432210842
+      - 0.5954206809214123
+      - 0.002563313386630115
+      - 0.0009298608997851385
+      - -1.6040777400215815
+    rectification_matrix:
+      rows: 3
+      cols: 3
+      data:
+      - 0.9996630184107447
+      - 0.02068115924476558
+      - 0.015688826412826817
+      - -0.021243054422392344
+      - 0.999106508559997
+      - 0.03653651860618241
+      - -0.014919191021179466
+      - -0.036857485065387774
+      - 0.9992091590522618
+    projection_matrix:
+      rows: 3
+      cols: 4
+      data:
+      - 771.3400185619274
+      - 0.0
+      - 328.74793243408203
+      - 0.0
+      - 0.0
+      - 771.3400185619274
+      - 230.5443172454834
+      - 71.0303526081743
+      - 0.0
+      - 0.0
+      - 1.0
+      - 0.0
 
   run-stereo.sh: |
     #!/usr/bin/env bash
@@ -37,8 +151,8 @@ data:
 
     source /opt/ros/kilted/setup.bash
 
-    LEFT_VIDEO_DEVICE="${LEFT_VIDEO_DEVICE:-/host-dev/v4l/by-path/platform-fd500000.pcie-pci-0000:01:00.0-usb-0:1.2:1.0-video-index0}"
-    RIGHT_VIDEO_DEVICE="${RIGHT_VIDEO_DEVICE:-/host-dev/v4l/by-path/platform-fd500000.pcie-pci-0000:01:00.0-usb-0:1.1:1.0-video-index0}"
+    LEFT_VIDEO_DEVICE="${LEFT_VIDEO_DEVICE:-/host-dev/v4l/by-path/platform-fd500000.pcie-pci-0000:01:00.0-usb-0:1.1:1.0-video-index0}"
+    RIGHT_VIDEO_DEVICE="${RIGHT_VIDEO_DEVICE:-/host-dev/v4l/by-path/platform-fd500000.pcie-pci-0000:01:00.0-usb-0:1.2:1.0-video-index0}"
     STEREO_NAMESPACE="${STEREO_NAMESPACE:-stereo}"
     APPROX_SYNC_TOLERANCE="${APPROX_SYNC_TOLERANCE:-0.03}"
 
