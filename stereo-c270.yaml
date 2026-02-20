@@ -221,7 +221,8 @@ data:
 
     start_bg ros2 run usb_cam usb_cam_node_exe       --ros-args       --remap __ns:=/${STEREO_NAMESPACE}/left       --params-file /tmp/spot-stereo/usb_cam_left.yaml
 
-    start_bg ros2 launch image_proc image_proc.launch.py       namespace:=${STEREO_NAMESPACE}/left
+    # image_proc stays disabled: rectification nodes require exact image/camera_info timestamp sync
+    # that usb_cam does not guarantee for C270 in this setup; stereo core uses image_raw + approximate sync.
 
     cleanup() {
       kill "${PIDS[@]}" 2>/dev/null || true
@@ -308,7 +309,8 @@ data:
 
     start_bg ros2 run usb_cam usb_cam_node_exe       --ros-args       --remap __ns:=/${STEREO_NAMESPACE}/right       --params-file /tmp/spot-stereo/usb_cam_right.yaml
 
-    start_bg ros2 launch image_proc image_proc.launch.py       namespace:=${STEREO_NAMESPACE}/right
+    # image_proc stays disabled: rectification nodes require exact image/camera_info timestamp sync
+    # that usb_cam does not guarantee for C270 in this setup; stereo core uses image_raw + approximate sync.
 
     cleanup() {
       kill "${PIDS[@]}" 2>/dev/null || true
@@ -327,10 +329,12 @@ data:
 
     STEREO_NAMESPACE="${STEREO_NAMESPACE:-stereo}"
     APPROX_SYNC_TOLERANCE="${APPROX_SYNC_TOLERANCE:-0.12}"
+    POINTCLOUD_SYNC_TOLERANCE="${POINTCLOUD_SYNC_TOLERANCE:-20.0}"
     DISPARITY_RANGE="${DISPARITY_RANGE:-192}"
 
     echo "[spot-stereo-c270-core] STEREO_NAMESPACE=${STEREO_NAMESPACE}"
     echo "[spot-stereo-c270-core] APPROX_SYNC_TOLERANCE=${APPROX_SYNC_TOLERANCE}"
+    echo "[spot-stereo-c270-core] POINTCLOUD_SYNC_TOLERANCE=${POINTCLOUD_SYNC_TOLERANCE}"
     echo "[spot-stereo-c270-core] DISPARITY_RANGE=${DISPARITY_RANGE}"
 
     PIDS=()
@@ -340,9 +344,9 @@ data:
       PIDS+=("$!")
     }
 
-    start_bg ros2 run stereo_image_proc disparity_node --ros-args       --remap __ns:=/${STEREO_NAMESPACE}       -p approximate_sync:=true       -p approximate_sync_tolerance_seconds:=${APPROX_SYNC_TOLERANCE}       -p disparity_range:=${DISPARITY_RANGE}       --remap left/camera_info:=/${STEREO_NAMESPACE}/left/camera_info       --remap right/camera_info:=/${STEREO_NAMESPACE}/right/camera_info       --remap left/image_rect:=/${STEREO_NAMESPACE}/left/image_rect       --remap right/image_rect:=/${STEREO_NAMESPACE}/right/image_rect
+    start_bg ros2 run stereo_image_proc disparity_node --ros-args       --remap __ns:=/${STEREO_NAMESPACE}       -p approximate_sync:=true       -p approximate_sync_tolerance_seconds:=${APPROX_SYNC_TOLERANCE}       -p disparity_range:=${DISPARITY_RANGE}       --remap left/camera_info:=/${STEREO_NAMESPACE}/left/camera_info       --remap right/camera_info:=/${STEREO_NAMESPACE}/right/camera_info       --remap left/image_rect:=/${STEREO_NAMESPACE}/left/image_raw       --remap right/image_rect:=/${STEREO_NAMESPACE}/right/image_raw
 
-    start_bg ros2 run stereo_image_proc point_cloud_node --ros-args       --remap __ns:=/${STEREO_NAMESPACE}       -p approximate_sync:=true       -p approximate_sync_tolerance_seconds:=${APPROX_SYNC_TOLERANCE}       -p avoid_point_cloud_padding:=true       --remap disparity:=/${STEREO_NAMESPACE}/disparity       --remap left/camera_info:=/${STEREO_NAMESPACE}/left/camera_info       --remap right/camera_info:=/${STEREO_NAMESPACE}/right/camera_info       --remap left/image_rect_color:=/${STEREO_NAMESPACE}/left/image_rect_color
+    start_bg ros2 run stereo_image_proc point_cloud_node --ros-args       --remap __ns:=/${STEREO_NAMESPACE}       -p approximate_sync:=true       -p approximate_sync_tolerance_seconds:=${POINTCLOUD_SYNC_TOLERANCE}       -p avoid_point_cloud_padding:=true       --remap disparity:=/${STEREO_NAMESPACE}/disparity       --remap left/camera_info:=/${STEREO_NAMESPACE}/left/camera_info       --remap right/camera_info:=/${STEREO_NAMESPACE}/right/camera_info       --remap left/image_rect_color:=/${STEREO_NAMESPACE}/left/image_raw
 
     cleanup() {
       kill "${PIDS[@]}" 2>/dev/null || true
@@ -505,7 +509,9 @@ spec:
             - name: STEREO_NAMESPACE
               value: "stereo"
             - name: APPROX_SYNC_TOLERANCE
-              value: "0.12"
+              value: "20.0"
+            - name: POINTCLOUD_SYNC_TOLERANCE
+              value: "20.0"
             - name: DISPARITY_RANGE
               value: "192"
           command: ["bash", "-lc"]
