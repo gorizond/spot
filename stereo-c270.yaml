@@ -155,10 +155,13 @@ data:
     RIGHT_VIDEO_DEVICE="${RIGHT_VIDEO_DEVICE:-/host-dev/v4l/by-path/platform-fd500000.pcie-pci-0000:01:00.0-usb-0:1.2:1.0-video-index0}"
     STEREO_NAMESPACE="${STEREO_NAMESPACE:-stereo}"
     APPROX_SYNC_TOLERANCE="${APPROX_SYNC_TOLERANCE:-0.12}"
+    DISPARITY_RANGE="${DISPARITY_RANGE:-192}"
 
     echo "[spot-stereo-c270] LEFT_VIDEO_DEVICE=${LEFT_VIDEO_DEVICE}"
     echo "[spot-stereo-c270] RIGHT_VIDEO_DEVICE=${RIGHT_VIDEO_DEVICE}"
     echo "[spot-stereo-c270] STEREO_NAMESPACE=${STEREO_NAMESPACE}"
+    echo "[spot-stereo-c270] APPROX_SYNC_TOLERANCE=${APPROX_SYNC_TOLERANCE}"
+    echo "[spot-stereo-c270] DISPARITY_RANGE=${DISPARITY_RANGE}"
 
     wait_for_device() {
       local dev="$1"
@@ -252,6 +255,7 @@ data:
       --remap __ns:=/${STEREO_NAMESPACE} \
       -p approximate_sync:=true \
       -p approximate_sync_tolerance_seconds:=${APPROX_SYNC_TOLERANCE} \
+      -p disparity_range:=${DISPARITY_RANGE} \
       --remap left/camera_info:=/${STEREO_NAMESPACE}/left/camera_info \
       --remap right/camera_info:=/${STEREO_NAMESPACE}/right/camera_info \
       --remap left/image_rect:=/${STEREO_NAMESPACE}/left/image_rect \
@@ -312,6 +316,8 @@ spec:
               value: "stereo"
             - name: APPROX_SYNC_TOLERANCE
               value: "0.12"
+            - name: DISPARITY_RANGE
+              value: "192"
             - name: LEFT_VIDEO_DEVICE
               value: "/host-dev/v4l/by-path/platform-fd500000.pcie-pci-0000:01:00.0-usb-0:1.1:1.0-video-index0"
             - name: RIGHT_VIDEO_DEVICE
