@@ -150,11 +150,14 @@ Quick troubleshooting (field checklist):
 
 ## Stereo vision (2x Logitech C270 via USB)
 
-`spot-stereo-c270` is deployed via `stereo-c270.yaml` as a dedicated DaemonSet:
+`spot-stereo-c270` is deployed via `stereo-c270.yaml` as **three DaemonSets** (one pod each on labeled robot nodes):
 
+- `spot-stereo-c270-left`: left `usb_cam` + `image_proc`
+- `spot-stereo-c270-right`: right `usb_cam` + `image_proc`
+- `spot-stereo-c270-core`: `stereo_image_proc` (`disparity_node` + `point_cloud_node`)
 - image: `ghcr.io/gorizond/spot-stereo-c270:latest`
-- runtime: ROS 2 Kilted (`usb_cam` + `stereo_image_proc`)
-- sync mode: `approximate_sync=true` (tolerance `0.03s` by default)
+- runtime: ROS 2 Kilted
+- sync mode: `approximate_sync=true` (tolerance `0.12s` for disparity + point cloud)
 - node label gate: `gorizond.io/spot-stereo=true`
 - DDS runtime: `RMW_IMPLEMENTATION=rmw_cyclonedds_cpp`
 

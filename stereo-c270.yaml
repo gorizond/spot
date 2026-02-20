@@ -145,23 +145,17 @@ data:
       - 1.0
       - 0.0
 
-  run-stereo.sh: |
+  run-left.sh: |
     #!/usr/bin/env bash
     set -eo pipefail
 
     source /opt/ros/kilted/setup.bash
 
     LEFT_VIDEO_DEVICE="${LEFT_VIDEO_DEVICE:-/host-dev/v4l/by-path/platform-fd500000.pcie-pci-0000:01:00.0-usb-0:1.1:1.0-video-index0}"
-    RIGHT_VIDEO_DEVICE="${RIGHT_VIDEO_DEVICE:-/host-dev/v4l/by-path/platform-fd500000.pcie-pci-0000:01:00.0-usb-0:1.2:1.0-video-index0}"
     STEREO_NAMESPACE="${STEREO_NAMESPACE:-stereo}"
-    APPROX_SYNC_TOLERANCE="${APPROX_SYNC_TOLERANCE:-0.12}"
-    DISPARITY_RANGE="${DISPARITY_RANGE:-192}"
 
-    echo "[spot-stereo-c270] LEFT_VIDEO_DEVICE=${LEFT_VIDEO_DEVICE}"
-    echo "[spot-stereo-c270] RIGHT_VIDEO_DEVICE=${RIGHT_VIDEO_DEVICE}"
-    echo "[spot-stereo-c270] STEREO_NAMESPACE=${STEREO_NAMESPACE}"
-    echo "[spot-stereo-c270] APPROX_SYNC_TOLERANCE=${APPROX_SYNC_TOLERANCE}"
-    echo "[spot-stereo-c270] DISPARITY_RANGE=${DISPARITY_RANGE}"
+    echo "[spot-stereo-c270-left] LEFT_VIDEO_DEVICE=${LEFT_VIDEO_DEVICE}"
+    echo "[spot-stereo-c270-left] STEREO_NAMESPACE=${STEREO_NAMESPACE}"
 
     wait_for_device() {
       local dev="$1"
@@ -174,12 +168,9 @@ data:
         sleep 1
       done
 
-      echo "[spot-stereo-c270] ERROR: device not found: ${dev}" >&2
+      echo "[spot-stereo-c270-left] ERROR: device not found: ${dev}" >&2
       return 1
     }
-
-    wait_for_device "${LEFT_VIDEO_DEVICE}"
-    wait_for_device "${RIGHT_VIDEO_DEVICE}"
 
     resolve_video_device() {
       local dev="$1"
@@ -212,20 +203,100 @@ data:
       echo "${candidate}"
     }
 
+    wait_for_device "${LEFT_VIDEO_DEVICE}"
     LEFT_VIDEO_DEVICE_RESOLVED="$(resolve_video_device "${LEFT_VIDEO_DEVICE}")"
-    RIGHT_VIDEO_DEVICE_RESOLVED="$(resolve_video_device "${RIGHT_VIDEO_DEVICE}")"
-
-    echo "[spot-stereo-c270] LEFT_VIDEO_DEVICE_RESOLVED=${LEFT_VIDEO_DEVICE_RESOLVED}"
-    echo "[spot-stereo-c270] RIGHT_VIDEO_DEVICE_RESOLVED=${RIGHT_VIDEO_DEVICE_RESOLVED}"
-
+    echo "[spot-stereo-c270-left] LEFT_VIDEO_DEVICE_RESOLVED=${LEFT_VIDEO_DEVICE_RESOLVED}"
     wait_for_device "${LEFT_VIDEO_DEVICE_RESOLVED}"
-    wait_for_device "${RIGHT_VIDEO_DEVICE_RESOLVED}"
 
     mkdir -p /tmp/spot-stereo
     cp /config/usb_cam_left.yaml /tmp/spot-stereo/usb_cam_left.yaml
-    cp /config/usb_cam_right.yaml /tmp/spot-stereo/usb_cam_right.yaml
-
     sed -i "s|__LEFT_VIDEO_DEVICE__|${LEFT_VIDEO_DEVICE_RESOLVED}|g" /tmp/spot-stereo/usb_cam_left.yaml
+
+    PIDS=()
+
+    start_bg() {
+      "$@" &
+      PIDS+=("$!")
+    }
+
+    start_bg ros2 run usb_cam usb_cam_node_exe       --ros-args       --remap __ns:=/${STEREO_NAMESPACE}/left       --params-file /tmp/spot-stereo/usb_cam_left.yaml
+
+    start_bg ros2 launch image_proc image_proc.launch.py       namespace:=${STEREO_NAMESPACE}/left
+
+    cleanup() {
+      kill "${PIDS[@]}" 2>/dev/null || true
+      wait "${PIDS[@]}" 2>/dev/null || true
+    }
+    trap cleanup EXIT INT TERM
+
+    wait -n "${PIDS[@]}"
+    exit $?
+
+  run-right.sh: |
+    #!/usr/bin/env bash
+    set -eo pipefail
+
+    source /opt/ros/kilted/setup.bash
+
+    RIGHT_VIDEO_DEVICE="${RIGHT_VIDEO_DEVICE:-/host-dev/v4l/by-path/platform-fd500000.pcie-pci-0000:01:00.0-usb-0:1.2:1.0-video-index0}"
+    STEREO_NAMESPACE="${STEREO_NAMESPACE:-stereo}"
+
+    echo "[spot-stereo-c270-right] RIGHT_VIDEO_DEVICE=${RIGHT_VIDEO_DEVICE}"
+    echo "[spot-stereo-c270-right] STEREO_NAMESPACE=${STEREO_NAMESPACE}"
+
+    wait_for_device() {
+      local dev="$1"
+      local retries="${2:-60}"
+
+      for _ in $(seq 1 "${retries}"); do
+        if [ -e "${dev}" ]; then
+          return 0
+        fi
+        sleep 1
+      done
+
+      echo "[spot-stereo-c270-right] ERROR: device not found: ${dev}" >&2
+      return 1
+    }
+
+    resolve_video_device() {
+      local dev="$1"
+      local target
+      local candidate
+      local video
+
+      if [ -L "${dev}" ]; then
+        target="$(readlink "${dev}" 2>/dev/null || true)"
+        video="$(echo "${target}" | grep -oE 'video[0-9]+' | head -n1 || true)"
+        if [ -n "${video}" ]; then
+          echo "/dev/${video}"
+          return 0
+        fi
+      fi
+
+      candidate="$(readlink -f "${dev}" 2>/dev/null || echo "${dev}")"
+      video="$(echo "${candidate}" | grep -oE 'video[0-9]+' | head -n1 || true)"
+      if [ -n "${video}" ]; then
+        echo "/dev/${video}"
+        return 0
+      fi
+
+      case "${candidate}" in
+        /host-dev/*)
+          candidate="/dev/${candidate#/host-dev/}"
+          ;;
+      esac
+
+      echo "${candidate}"
+    }
+
+    wait_for_device "${RIGHT_VIDEO_DEVICE}"
+    RIGHT_VIDEO_DEVICE_RESOLVED="$(resolve_video_device "${RIGHT_VIDEO_DEVICE}")"
+    echo "[spot-stereo-c270-right] RIGHT_VIDEO_DEVICE_RESOLVED=${RIGHT_VIDEO_DEVICE_RESOLVED}"
+    wait_for_device "${RIGHT_VIDEO_DEVICE_RESOLVED}"
+
+    mkdir -p /tmp/spot-stereo
+    cp /config/usb_cam_right.yaml /tmp/spot-stereo/usb_cam_right.yaml
     sed -i "s|__RIGHT_VIDEO_DEVICE__|${RIGHT_VIDEO_DEVICE_RESOLVED}|g" /tmp/spot-stereo/usb_cam_right.yaml
 
     PIDS=()
@@ -235,40 +306,43 @@ data:
       PIDS+=("$!")
     }
 
-    start_bg ros2 run usb_cam usb_cam_node_exe \
-      --ros-args \
-      --remap __ns:=/${STEREO_NAMESPACE}/left \
-      --params-file /tmp/spot-stereo/usb_cam_left.yaml
+    start_bg ros2 run usb_cam usb_cam_node_exe       --ros-args       --remap __ns:=/${STEREO_NAMESPACE}/right       --params-file /tmp/spot-stereo/usb_cam_right.yaml
 
-    start_bg ros2 run usb_cam usb_cam_node_exe \
-      --ros-args \
-      --remap __ns:=/${STEREO_NAMESPACE}/right \
-      --params-file /tmp/spot-stereo/usb_cam_right.yaml
+    start_bg ros2 launch image_proc image_proc.launch.py       namespace:=${STEREO_NAMESPACE}/right
 
-    start_bg ros2 launch image_proc image_proc.launch.py \
-      namespace:=${STEREO_NAMESPACE}/left
+    cleanup() {
+      kill "${PIDS[@]}" 2>/dev/null || true
+      wait "${PIDS[@]}" 2>/dev/null || true
+    }
+    trap cleanup EXIT INT TERM
 
-    start_bg ros2 launch image_proc image_proc.launch.py \
-      namespace:=${STEREO_NAMESPACE}/right
+    wait -n "${PIDS[@]}"
+    exit $?
 
-    start_bg ros2 run stereo_image_proc disparity_node --ros-args \
-      --remap __ns:=/${STEREO_NAMESPACE} \
-      -p approximate_sync:=true \
-      -p approximate_sync_tolerance_seconds:=${APPROX_SYNC_TOLERANCE} \
-      -p disparity_range:=${DISPARITY_RANGE} \
-      --remap left/camera_info:=/${STEREO_NAMESPACE}/left/camera_info \
-      --remap right/camera_info:=/${STEREO_NAMESPACE}/right/camera_info \
-      --remap left/image_rect:=/${STEREO_NAMESPACE}/left/image_rect \
-      --remap right/image_rect:=/${STEREO_NAMESPACE}/right/image_rect
+  run-stereo-core.sh: |
+    #!/usr/bin/env bash
+    set -eo pipefail
 
-    start_bg ros2 run stereo_image_proc point_cloud_node --ros-args \
-      --remap __ns:=/${STEREO_NAMESPACE} \
-      -p approximate_sync:=true \
-      -p avoid_point_cloud_padding:=true \
-      --remap disparity:=/${STEREO_NAMESPACE}/disparity \
-      --remap left/camera_info:=/${STEREO_NAMESPACE}/left/camera_info \
-      --remap right/camera_info:=/${STEREO_NAMESPACE}/right/camera_info \
-      --remap left/image_rect_color:=/${STEREO_NAMESPACE}/left/image_rect_color
+    source /opt/ros/kilted/setup.bash
+
+    STEREO_NAMESPACE="${STEREO_NAMESPACE:-stereo}"
+    APPROX_SYNC_TOLERANCE="${APPROX_SYNC_TOLERANCE:-0.12}"
+    DISPARITY_RANGE="${DISPARITY_RANGE:-192}"
+
+    echo "[spot-stereo-c270-core] STEREO_NAMESPACE=${STEREO_NAMESPACE}"
+    echo "[spot-stereo-c270-core] APPROX_SYNC_TOLERANCE=${APPROX_SYNC_TOLERANCE}"
+    echo "[spot-stereo-c270-core] DISPARITY_RANGE=${DISPARITY_RANGE}"
+
+    PIDS=()
+
+    start_bg() {
+      "$@" &
+      PIDS+=("$!")
+    }
+
+    start_bg ros2 run stereo_image_proc disparity_node --ros-args       --remap __ns:=/${STEREO_NAMESPACE}       -p approximate_sync:=true       -p approximate_sync_tolerance_seconds:=${APPROX_SYNC_TOLERANCE}       -p disparity_range:=${DISPARITY_RANGE}       --remap left/camera_info:=/${STEREO_NAMESPACE}/left/camera_info       --remap right/camera_info:=/${STEREO_NAMESPACE}/right/camera_info       --remap left/image_rect:=/${STEREO_NAMESPACE}/left/image_rect       --remap right/image_rect:=/${STEREO_NAMESPACE}/right/image_rect
+
+    start_bg ros2 run stereo_image_proc point_cloud_node --ros-args       --remap __ns:=/${STEREO_NAMESPACE}       -p approximate_sync:=true       -p approximate_sync_tolerance_seconds:=${APPROX_SYNC_TOLERANCE}       -p avoid_point_cloud_padding:=true       --remap disparity:=/${STEREO_NAMESPACE}/disparity       --remap left/camera_info:=/${STEREO_NAMESPACE}/left/camera_info       --remap right/camera_info:=/${STEREO_NAMESPACE}/right/camera_info       --remap left/image_rect_color:=/${STEREO_NAMESPACE}/left/image_rect_color
 
     cleanup() {
       kill "${PIDS[@]}" 2>/dev/null || true
@@ -282,18 +356,18 @@ data:
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: spot-stereo-c270
+  name: spot-stereo-c270-left
   labels:
-    app.kubernetes.io/name: spot-stereo-c270
+    app.kubernetes.io/name: spot-stereo-c270-left
     app.kubernetes.io/part-of: spot
 spec:
   selector:
     matchLabels:
-      app.kubernetes.io/name: spot-stereo-c270
+      app.kubernetes.io/name: spot-stereo-c270-left
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: spot-stereo-c270
+        app.kubernetes.io/name: spot-stereo-c270-left
         app.kubernetes.io/part-of: spot
     spec:
       nodeSelector:
@@ -301,7 +375,123 @@ spec:
         gorizond.io/robot: "true"
         gorizond.io/spot-stereo: "true"
       containers:
-        - name: stereo-c270
+        - name: stereo-c270-left
+          image: ghcr.io/gorizond/spot-stereo-c270:latest
+          imagePullPolicy: Always
+          securityContext:
+            privileged: true
+            runAsUser: 0
+            runAsGroup: 0
+            allowPrivilegeEscalation: true
+          env:
+            - name: RMW_IMPLEMENTATION
+              value: "rmw_cyclonedds_cpp"
+            - name: STEREO_NAMESPACE
+              value: "stereo"
+            - name: LEFT_VIDEO_DEVICE
+              value: "/host-dev/v4l/by-path/platform-fd500000.pcie-pci-0000:01:00.0-usb-0:1.1:1.0-video-index0"
+          command: ["bash", "-lc"]
+          args:
+            - |
+              set -eo pipefail
+              /config/run-left.sh
+          volumeMounts:
+            - name: host-dev
+              mountPath: /host-dev
+            - name: stereo-config
+              mountPath: /config
+              readOnly: true
+      volumes:
+        - name: host-dev
+          hostPath:
+            path: /dev
+            type: Directory
+        - name: stereo-config
+          configMap:
+            name: spot-stereo-c270-config
+            defaultMode: 0555
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: spot-stereo-c270-right
+  labels:
+    app.kubernetes.io/name: spot-stereo-c270-right
+    app.kubernetes.io/part-of: spot
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: spot-stereo-c270-right
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: spot-stereo-c270-right
+        app.kubernetes.io/part-of: spot
+    spec:
+      nodeSelector:
+        kubernetes.io/arch: arm64
+        gorizond.io/robot: "true"
+        gorizond.io/spot-stereo: "true"
+      containers:
+        - name: stereo-c270-right
+          image: ghcr.io/gorizond/spot-stereo-c270:latest
+          imagePullPolicy: Always
+          securityContext:
+            privileged: true
+            runAsUser: 0
+            runAsGroup: 0
+            allowPrivilegeEscalation: true
+          env:
+            - name: RMW_IMPLEMENTATION
+              value: "rmw_cyclonedds_cpp"
+            - name: STEREO_NAMESPACE
+              value: "stereo"
+            - name: RIGHT_VIDEO_DEVICE
+              value: "/host-dev/v4l/by-path/platform-fd500000.pcie-pci-0000:01:00.0-usb-0:1.2:1.0-video-index0"
+          command: ["bash", "-lc"]
+          args:
+            - |
+              set -eo pipefail
+              /config/run-right.sh
+          volumeMounts:
+            - name: host-dev
+              mountPath: /host-dev
+            - name: stereo-config
+              mountPath: /config
+              readOnly: true
+      volumes:
+        - name: host-dev
+          hostPath:
+            path: /dev
+            type: Directory
+        - name: stereo-config
+          configMap:
+            name: spot-stereo-c270-config
+            defaultMode: 0555
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: spot-stereo-c270-core
+  labels:
+    app.kubernetes.io/name: spot-stereo-c270-core
+    app.kubernetes.io/part-of: spot
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: spot-stereo-c270-core
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: spot-stereo-c270-core
+        app.kubernetes.io/part-of: spot
+    spec:
+      nodeSelector:
+        kubernetes.io/arch: arm64
+        gorizond.io/robot: "true"
+        gorizond.io/spot-stereo: "true"
+      containers:
+        - name: stereo-c270-core
           image: ghcr.io/gorizond/spot-stereo-c270:latest
           imagePullPolicy: Always
           securityContext:
@@ -318,26 +508,16 @@ spec:
               value: "0.12"
             - name: DISPARITY_RANGE
               value: "192"
-            - name: LEFT_VIDEO_DEVICE
-              value: "/host-dev/v4l/by-path/platform-fd500000.pcie-pci-0000:01:00.0-usb-0:1.1:1.0-video-index0"
-            - name: RIGHT_VIDEO_DEVICE
-              value: "/host-dev/v4l/by-path/platform-fd500000.pcie-pci-0000:01:00.0-usb-0:1.2:1.0-video-index0"
           command: ["bash", "-lc"]
           args:
             - |
               set -eo pipefail
-              /config/run-stereo.sh
+              /config/run-stereo-core.sh
           volumeMounts:
-            - name: host-dev
-              mountPath: /host-dev
             - name: stereo-config
               mountPath: /config
               readOnly: true
       volumes:
-        - name: host-dev
-          hostPath:
-            path: /dev
-            type: Directory
         - name: stereo-config
           configMap:
             name: spot-stereo-c270-config
