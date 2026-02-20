@@ -64,12 +64,39 @@ data:
     wait_for_device "${LEFT_VIDEO_DEVICE}"
     wait_for_device "${RIGHT_VIDEO_DEVICE}"
 
+    resolve_video_device() {
+      local dev="$1"
+      local resolved
+
+      resolved="$(readlink -f "${dev}" 2>/dev/null || true)"
+      if [ -n "${resolved}" ]; then
+        dev="${resolved}"
+      fi
+
+      case "${dev}" in
+        /host-dev/*)
+          dev="/dev/${dev#/host-dev/}"
+          ;;
+      esac
+
+      echo "${dev}"
+    }
+
+    LEFT_VIDEO_DEVICE_RESOLVED="$(resolve_video_device "${LEFT_VIDEO_DEVICE}")"
+    RIGHT_VIDEO_DEVICE_RESOLVED="$(resolve_video_device "${RIGHT_VIDEO_DEVICE}")"
+
+    echo "[spot-stereo-c270] LEFT_VIDEO_DEVICE_RESOLVED=${LEFT_VIDEO_DEVICE_RESOLVED}"
+    echo "[spot-stereo-c270] RIGHT_VIDEO_DEVICE_RESOLVED=${RIGHT_VIDEO_DEVICE_RESOLVED}"
+
+    wait_for_device "${LEFT_VIDEO_DEVICE_RESOLVED}"
+    wait_for_device "${RIGHT_VIDEO_DEVICE_RESOLVED}"
+
     mkdir -p /tmp/spot-stereo
     cp /config/usb_cam_left.yaml /tmp/spot-stereo/usb_cam_left.yaml
     cp /config/usb_cam_right.yaml /tmp/spot-stereo/usb_cam_right.yaml
 
-    sed -i "s|__LEFT_VIDEO_DEVICE__|${LEFT_VIDEO_DEVICE}|g" /tmp/spot-stereo/usb_cam_left.yaml
-    sed -i "s|__RIGHT_VIDEO_DEVICE__|${RIGHT_VIDEO_DEVICE}|g" /tmp/spot-stereo/usb_cam_right.yaml
+    sed -i "s|__LEFT_VIDEO_DEVICE__|${LEFT_VIDEO_DEVICE_RESOLVED}|g" /tmp/spot-stereo/usb_cam_left.yaml
+    sed -i "s|__RIGHT_VIDEO_DEVICE__|${RIGHT_VIDEO_DEVICE_RESOLVED}|g" /tmp/spot-stereo/usb_cam_right.yaml
 
     PIDS=()
 
