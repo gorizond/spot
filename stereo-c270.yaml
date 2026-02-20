@@ -199,9 +199,9 @@ spec:
             - name: APPROX_SYNC_TOLERANCE
               value: "0.03"
             - name: LEFT_VIDEO_DEVICE
-              value: "/host-dev/v4l/by-path/platform-fd500000.pcie-pci-0000:01:00.0-usb-0:1.2:1.0-video-index0"
-            - name: RIGHT_VIDEO_DEVICE
               value: "/host-dev/v4l/by-path/platform-fd500000.pcie-pci-0000:01:00.0-usb-0:1.1:1.0-video-index0"
+            - name: RIGHT_VIDEO_DEVICE
+              value: "/host-dev/v4l/by-path/platform-fd500000.pcie-pci-0000:01:00.0-usb-0:1.2:1.0-video-index0"
           command: ["bash", "-lc"]
           args:
             - |

@@ -160,8 +160,8 @@ Quick troubleshooting (field checklist):
 
 Default video mapping on `spot-5` uses **stable by-path symlinks**:
 
-- left: `platform-fd500000.pcie-pci-0000:01:00.0-usb-0:1.2:1.0-video-index0`
-- right: `platform-fd500000.pcie-pci-0000:01:00.0-usb-0:1.1:1.0-video-index0`
+- left: `platform-fd500000.pcie-pci-0000:01:00.0-usb-0:1.1:1.0-video-index0`
+- right: `platform-fd500000.pcie-pci-0000:01:00.0-usb-0:1.2:1.0-video-index0`
 
 Important: for two identical C270 webcams, `by-id` may collide (same serial), so `by-path` is preferred.
 
