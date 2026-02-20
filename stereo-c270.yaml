@@ -167,10 +167,16 @@ data:
           reliability=ReliabilityPolicy.BEST_EFFORT,
           durability=DurabilityPolicy.VOLATILE,
         )
-        camera_info_qos = QoSProfile(
+        camera_info_sub_qos = QoSProfile(
           history=HistoryPolicy.KEEP_LAST,
           depth=5,
           reliability=ReliabilityPolicy.BEST_EFFORT,
+          durability=DurabilityPolicy.VOLATILE,
+        )
+        camera_info_pub_qos = QoSProfile(
+          history=HistoryPolicy.KEEP_LAST,
+          depth=5,
+          reliability=ReliabilityPolicy.RELIABLE,
           durability=DurabilityPolicy.VOLATILE,
         )
 
@@ -182,8 +188,8 @@ data:
         for side in ('left', 'right'):
           base = f'/{ns}/{side}'
           self.create_subscription(Image, f'{base}/image_raw', self._make_image_cb(side), image_qos)
-          self.create_subscription(CameraInfo, f'{base}/camera_info', self._make_ci_cb(side), camera_info_qos)
-          self._sides[side]['pub'] = self.create_publisher(CameraInfo, f'{base}/camera_info_sync', camera_info_qos)
+          self.create_subscription(CameraInfo, f'{base}/camera_info', self._make_ci_cb(side), camera_info_sub_qos)
+          self._sides[side]['pub'] = self.create_publisher(CameraInfo, f'{base}/camera_info_sync', camera_info_pub_qos)
 
         self.create_timer(10.0, self._log_stats)
         self.get_logger().info(f'camera_info restamp enabled for namespace=/{ns}')
