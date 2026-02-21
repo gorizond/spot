@@ -210,7 +210,7 @@ spec:
             - name: PYTHONUNBUFFERED
               value: "1"
             - name: RSP_PUBLISH_FREQUENCY
-              value: "40.0"
+              value: "20.0"
           command: ["bash", "-lc"]
           args:
             - |
@@ -244,8 +244,9 @@ spec:
               LAUNCH_PID=$!
 
               for _ in $(seq 1 60); do
-                if ros2 param set /robot_state_publisher publish_frequency "${RSP_PUBLISH_FREQUENCY}" >/tmp/rsp_param_set.log 2>&1; then
-                  echo "[spot-champ] publish_frequency set to ${RSP_PUBLISH_FREQUENCY}"
+                RSP_NODE="$(ros2 node list 2>/dev/null | awk '/robot_state_publisher$/ {print; exit}')"
+                if [ -n "${RSP_NODE}" ] && ros2 param set "${RSP_NODE}" publish_frequency "${RSP_PUBLISH_FREQUENCY}" >/tmp/rsp_param_set.log 2>&1; then
+                  echo "[spot-champ] ${RSP_NODE} publish_frequency set to ${RSP_PUBLISH_FREQUENCY}"
                   break
                 fi
                 sleep 2
