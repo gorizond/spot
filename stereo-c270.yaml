@@ -7,7 +7,7 @@ data:
     /**:
       ros__parameters:
         video_device: "__LEFT_VIDEO_DEVICE__"
-        framerate: 8.0
+        framerate: 5.0
         io_method: "mmap"
         frame_id: "stereo_left_optical_frame"
         pixel_format: "mjpeg2rgb"
@@ -21,7 +21,7 @@ data:
     /**:
       ros__parameters:
         video_device: "__RIGHT_VIDEO_DEVICE__"
-        framerate: 8.0
+        framerate: 5.0
         io_method: "mmap"
         frame_id: "stereo_right_optical_frame"
         pixel_format: "mjpeg2rgb"
@@ -423,7 +423,7 @@ data:
     STEREO_NAMESPACE="${STEREO_NAMESPACE:-stereo}"
     APPROX_SYNC_TOLERANCE="${APPROX_SYNC_TOLERANCE:-0.35}"
     POINTCLOUD_SYNC_TOLERANCE="${POINTCLOUD_SYNC_TOLERANCE:-0.35}"
-    DISPARITY_RANGE="${DISPARITY_RANGE:-192}"
+    DISPARITY_RANGE="${DISPARITY_RANGE:-176}"
 
     echo "[spot-stereo-c270-core] STEREO_NAMESPACE=${STEREO_NAMESPACE}"
     echo "[spot-stereo-c270-core] APPROX_SYNC_TOLERANCE=${APPROX_SYNC_TOLERANCE}"
@@ -638,7 +638,7 @@ spec:
             - name: POINTCLOUD_SYNC_TOLERANCE
               value: "0.35"
             - name: DISPARITY_RANGE
-              value: "192"
+              value: "176"
           command: ["bash", "-lc"]
           args:
             - |

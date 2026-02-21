@@ -152,8 +152,8 @@ Quick troubleshooting (field checklist):
 
 `spot-stereo-c270` is deployed via `stereo-c270.yaml` as **three DaemonSets** (one pod each on labeled robot nodes):
 
-- `spot-stereo-c270-left`: left `usb_cam` (10 FPS)
-- `spot-stereo-c270-right`: right `usb_cam` (10 FPS)
+- `spot-stereo-c270-left`: left `usb_cam` (5 FPS)
+- `spot-stereo-c270-right`: right `usb_cam` (5 FPS)
 - `spot-stereo-c270-core`: `stereo_image_proc` (`disparity_node` + `point_cloud_node`)
 - image: `ghcr.io/gorizond/spot-stereo-c270:latest`
 - runtime: ROS 2 Kilted
