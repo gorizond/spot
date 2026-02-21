@@ -55,10 +55,13 @@ data:
         self.disparity_topic = os.getenv("DISPARITY_TOPIC", "/stereo/disparity")
         self.out_image_topic = os.getenv("OUT_IMAGE_TOPIC", "/spot/vision/left/detections_image")
         self.out_json_topic = os.getenv("OUT_JSON_TOPIC", "/spot/vision/left/detections")
-        self.min_conf = float(os.getenv("MIN_CONF", "0.45"))
+        self.min_conf = float(os.getenv("MIN_CONF", "0.25"))
         self.detect_fps = float(os.getenv("DETECT_FPS", "5.0"))
         self.max_disp_lag_s = float(os.getenv("MAX_DISP_LAG_S", "0.5"))
         self.default_baseline_m = float(os.getenv("DEFAULT_BASELINE_M", "0.0920869537"))
+        self.enable_generic_fallback = os.getenv("ENABLE_GENERIC_FALLBACK", "1") not in ("0", "false", "False")
+        self.fallback_max_boxes = int(os.getenv("FALLBACK_MAX_BOXES", "3"))
+        self.fallback_min_area_ratio = float(os.getenv("FALLBACK_MIN_AREA_RATIO", "0.015"))
 
         model_dir = Path(os.getenv("MODEL_DIR", "/tmp/spot-vision-models"))
         proto = model_dir / "deploy.prototxt"
@@ -95,7 +98,7 @@ data:
         self.create_subscription(DisparityImage, self.disparity_topic, self._on_disparity, 20)
 
         self.get_logger().info(
-          f"2D detector ready: image={self.image_topic}, disparity={self.disparity_topic}, conf>={self.min_conf}, fps={self.detect_fps}"
+          f"2D detector ready: image={self.image_topic}, disparity={self.disparity_topic}, conf>={self.min_conf}, fps={self.detect_fps}, fallback={self.enable_generic_fallback}"
         )
 
       @staticmethod
@@ -151,6 +154,47 @@ data:
           return None
         return float(float(f) * baseline / d)
 
+      def _generic_object_boxes(self, frame):
+        h, w = frame.shape[:2]
+        small_w = 320
+        small_h = int(320 * h / max(w, 1))
+        small_h = max(120, min(320, small_h))
+        small = cv2.resize(frame, (small_w, small_h))
+
+        gray = cv2.cvtColor(small, cv2.COLOR_BGR2GRAY)
+        blur = cv2.GaussianBlur(gray, (5, 5), 0)
+        edges = cv2.Canny(blur, 60, 140)
+        edges = cv2.dilate(edges, np.ones((3, 3), np.uint8), iterations=1)
+
+        contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        min_area = self.fallback_min_area_ratio * float(small_w * small_h)
+
+        boxes = []
+        for c in contours:
+          area = cv2.contourArea(c)
+          if area < min_area:
+            continue
+          x, y, bw, bh = cv2.boundingRect(c)
+          if bw < 8 or bh < 8:
+            continue
+
+          x1 = int(x * w / small_w)
+          y1 = int(y * h / small_h)
+          x2 = int((x + bw) * w / small_w)
+          y2 = int((y + bh) * h / small_h)
+          x1 = max(0, min(w - 1, x1))
+          x2 = max(0, min(w - 1, x2))
+          y1 = max(0, min(h - 1, y1))
+          y2 = max(0, min(h - 1, y2))
+          if x2 <= x1 or y2 <= y1:
+            continue
+
+          score = min(0.99, float(area) / float(small_w * small_h))
+          boxes.append((score, (x1, y1, x2, y2)))
+
+        boxes.sort(key=lambda x: x[0], reverse=True)
+        return boxes[: self.fallback_max_boxes]
+
       def _on_image(self, msg: Image):
         self._frames_seen += 1
 
@@ -172,13 +216,19 @@ data:
 
         img_stamp = self._stamp_sec(msg)
         items = []
+        best_raw_conf = 0.0
+        best_raw_cls = "background"
 
         for i in range(detections.shape[2]):
           conf = float(detections[0, 0, i, 2])
+          cls_id = int(detections[0, 0, i, 1])
+          if 0 <= cls_id < len(CLASSES) and conf > best_raw_conf:
+            best_raw_conf = conf
+            best_raw_cls = CLASSES[cls_id]
+
           if conf < self.min_conf:
             continue
 
-          cls_id = int(detections[0, 0, i, 1])
           if cls_id < 0 or cls_id >= len(CLASSES):
             continue
 
@@ -209,6 +259,24 @@ data:
             }
           )
 
+        if not items and self.enable_generic_fallback:
+          for score, (x1, y1, x2, y2) in self._generic_object_boxes(frame):
+            depth_m = self._bbox_depth_m(x1, y1, x2, y2, img_stamp)
+            label = f"object {score:.2f}"
+            if depth_m is not None:
+              label += f" {depth_m:.2f}m"
+            cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 180, 40), 2)
+            cv2.putText(frame, label, (x1, max(16, y1 - 8)), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 180, 40), 2)
+            items.append(
+              {
+                "class_id": -1,
+                "class_name": "object",
+                "confidence": round(float(score), 4),
+                "bbox_xyxy": [int(x1), int(y1), int(x2), int(y2)],
+                "depth_m": round(float(depth_m), 3) if depth_m is not None else None,
+              }
+            )
+
         out_img = self.bridge.cv2_to_imgmsg(frame, encoding="bgr8")
         out_img.header = msg.header
         self.image_pub.publish(out_img)
@@ -231,7 +299,7 @@ data:
         if now - self._last_log_wall >= 5.0:
           self._last_log_wall = now
           self.get_logger().info(
-            f"frames_seen={self._frames_seen} inferred={self._frames_inferred} dets={len(items)}"
+            f"frames_seen={self._frames_seen} inferred={self._frames_inferred} dets={len(items)} best={best_raw_cls}:{best_raw_conf:.3f}"
           )
 
 
@@ -292,7 +360,7 @@ spec:
             - name: OUT_JSON_TOPIC
               value: "/spot/vision/left/detections"
             - name: MIN_CONF
-              value: "0.45"
+              value: "0.25"
             - name: DETECT_FPS
               value: "5.0"
             - name: MAX_DISP_LAG_S
