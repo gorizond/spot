@@ -11,7 +11,7 @@ data:
     import time
     import urllib.request
     from pathlib import Path
-
+    
     import cv2
     import numpy as np
     import rclpy
@@ -20,14 +20,14 @@ data:
     from sensor_msgs.msg import Image
     from stereo_msgs.msg import DisparityImage
     from std_msgs.msg import String
-
+    
     CLASSES = [
       "background", "aeroplane", "bicycle", "bird", "boat", "bottle", "bus", "car", "cat", "chair",
       "cow", "diningtable", "dog", "horse", "motorbike", "person", "pottedplant", "sheep", "sofa", "train",
       "tvmonitor",
     ]
-
-
+    
+    
     def _download_if_needed(url: str, path: Path):
       if path.exists() and path.stat().st_size > 0:
         return
@@ -37,20 +37,20 @@ data:
         data = resp.read()
       tmp_path.write_bytes(data)
       tmp_path.replace(path)
-
-
+    
+    
     class MobileNetSSD2D(Node):
       def __init__(self):
         super().__init__("spot_2d_detector")
-
+    
         cv2.setNumThreads(1)
         try:
           cv2.ocl.setUseOpenCL(False)
         except Exception:
           pass
-
+    
         self.bridge = CvBridge()
-
+    
         self.image_topic = os.getenv("IMAGE_TOPIC", "/stereo/left/image_raw")
         self.disparity_topic = os.getenv("DISPARITY_TOPIC", "/stereo/disparity")
         self.out_image_topic = os.getenv("OUT_IMAGE_TOPIC", "/spot/vision/left/detections_image")
@@ -60,51 +60,54 @@ data:
         self.max_disp_lag_s = float(os.getenv("MAX_DISP_LAG_S", "0.5"))
         self.default_baseline_m = float(os.getenv("DEFAULT_BASELINE_M", "0.0920869537"))
         self.enable_generic_fallback = os.getenv("ENABLE_GENERIC_FALLBACK", "1") not in ("0", "false", "False")
+        self.enable_dnn = os.getenv("ENABLE_DNN", "0") not in ("0", "false", "False")
         self.fallback_max_boxes = int(os.getenv("FALLBACK_MAX_BOXES", "3"))
         self.fallback_min_area_ratio = float(os.getenv("FALLBACK_MIN_AREA_RATIO", "0.015"))
-
-        model_dir = Path(os.getenv("MODEL_DIR", "/tmp/spot-vision-models"))
-        proto = model_dir / "deploy.prototxt"
-        weights = model_dir / "mobilenet_iter_73000.caffemodel"
-
-        _download_if_needed(
-          "https://raw.githubusercontent.com/chuanqi305/MobileNet-SSD/master/deploy.prototxt",
-          proto,
-        )
-        _download_if_needed(
-          "https://github.com/chuanqi305/MobileNet-SSD/raw/master/mobilenet_iter_73000.caffemodel",
-          weights,
-        )
-
-        self.net = cv2.dnn.readNetFromCaffe(str(proto), str(weights))
-        self.net.setPreferableBackend(cv2.dnn.DNN_BACKEND_OPENCV)
-        self.net.setPreferableTarget(cv2.dnn.DNN_TARGET_CPU)
-
+    
+        self.net = None
+        if self.enable_dnn:
+          model_dir = Path(os.getenv("MODEL_DIR", "/tmp/spot-vision-models"))
+          proto = model_dir / "deploy.prototxt"
+          weights = model_dir / "mobilenet_iter_73000.caffemodel"
+    
+          _download_if_needed(
+            "https://raw.githubusercontent.com/chuanqi305/MobileNet-SSD/master/deploy.prototxt",
+            proto,
+          )
+          _download_if_needed(
+            "https://github.com/chuanqi305/MobileNet-SSD/raw/master/mobilenet_iter_73000.caffemodel",
+            weights,
+          )
+    
+          self.net = cv2.dnn.readNetFromCaffe(str(proto), str(weights))
+          self.net.setPreferableBackend(cv2.dnn.DNN_BACKEND_OPENCV)
+          self.net.setPreferableTarget(cv2.dnn.DNN_TARGET_CPU)
+    
         self._disp_lock = threading.Lock()
         self._disp = None
         self._disp_stamp = None
         self._disp_f = None
         self._disp_t = None
-
+    
         self._last_infer_wall = 0.0
         self._last_log_wall = 0.0
         self._frames_seen = 0
         self._frames_inferred = 0
-
+    
         self.image_pub = self.create_publisher(Image, self.out_image_topic, 10)
         self.json_pub = self.create_publisher(String, self.out_json_topic, 20)
-
+    
         self.create_subscription(Image, self.image_topic, self._on_image, 20)
         self.create_subscription(DisparityImage, self.disparity_topic, self._on_disparity, 20)
-
+    
         self.get_logger().info(
-          f"2D detector ready: image={self.image_topic}, disparity={self.disparity_topic}, conf>={self.min_conf}, fps={self.detect_fps}, fallback={self.enable_generic_fallback}"
+          f"2D detector ready: image={self.image_topic}, disparity={self.disparity_topic}, conf>={self.min_conf}, fps={self.detect_fps}, dnn={self.enable_dnn}, fallback={self.enable_generic_fallback}"
         )
-
+    
       @staticmethod
       def _stamp_sec(msg):
         return float(msg.header.stamp.sec) + float(msg.header.stamp.nanosec) * 1e-9
-
+    
       def _on_disparity(self, msg: DisparityImage):
         h = int(msg.image.height)
         w = int(msg.image.width)
@@ -115,13 +118,13 @@ data:
           arr = arr.reshape((h, w))
         except Exception:
           return
-
+    
         with self._disp_lock:
           self._disp = arr
           self._disp_stamp = self._stamp_sec(msg)
           self._disp_f = float(msg.f)
           self._disp_t = float(msg.t)
-
+    
       def _bbox_depth_m(self, x1, y1, x2, y2, img_stamp):
         with self._disp_lock:
           if self._disp is None or self._disp_stamp is None:
@@ -131,7 +134,7 @@ data:
           disp = self._disp
           f = self._disp_f
           t = self._disp_t
-
+    
         h, w = disp.shape
         x1 = max(0, min(w - 1, int(x1)))
         x2 = max(0, min(w, int(x2)))
@@ -139,36 +142,36 @@ data:
         y2 = max(0, min(h, int(y2)))
         if x2 <= x1 or y2 <= y1:
           return None
-
+    
         roi = disp[y1:y2, x1:x2]
         valid = np.isfinite(roi) & (roi > 0)
         if not np.any(valid):
           return None
-
+    
         d = float(np.median(roi[valid]))
         if d <= 0.0:
           return None
-
+    
         baseline = abs(float(t)) if t is not None and abs(float(t)) > 1e-6 else self.default_baseline_m
         if f is None or float(f) <= 0.0:
           return None
         return float(float(f) * baseline / d)
-
+    
       def _generic_object_boxes(self, frame):
         h, w = frame.shape[:2]
         small_w = 320
         small_h = int(320 * h / max(w, 1))
         small_h = max(120, min(320, small_h))
         small = cv2.resize(frame, (small_w, small_h))
-
+    
         gray = cv2.cvtColor(small, cv2.COLOR_BGR2GRAY)
         blur = cv2.GaussianBlur(gray, (5, 5), 0)
         edges = cv2.Canny(blur, 60, 140)
         edges = cv2.dilate(edges, np.ones((3, 3), np.uint8), iterations=1)
-
+    
         contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         min_area = self.fallback_min_area_ratio * float(small_w * small_h)
-
+    
         boxes = []
         for c in contours:
           area = cv2.contourArea(c)
@@ -177,7 +180,7 @@ data:
           x, y, bw, bh = cv2.boundingRect(c)
           if bw < 8 or bh < 8:
             continue
-
+    
           x1 = int(x * w / small_w)
           y1 = int(y * h / small_h)
           x2 = int((x + bw) * w / small_w)
@@ -188,77 +191,78 @@ data:
           y2 = max(0, min(h - 1, y2))
           if x2 <= x1 or y2 <= y1:
             continue
-
+    
           score = min(0.99, float(area) / float(small_w * small_h))
           boxes.append((score, (x1, y1, x2, y2)))
-
+    
         boxes.sort(key=lambda x: x[0], reverse=True)
         return boxes[: self.fallback_max_boxes]
-
+    
       def _on_image(self, msg: Image):
         self._frames_seen += 1
-
+    
         now = time.monotonic()
         min_dt = 1.0 / max(self.detect_fps, 0.1)
         if now - self._last_infer_wall < min_dt:
           return
         self._last_infer_wall = now
-
+    
         try:
           frame = self.bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
         except Exception:
           return
-
+    
         h, w = frame.shape[:2]
-        blob = cv2.dnn.blobFromImage(cv2.resize(frame, (300, 300)), 0.007843, (300, 300), 127.5)
-        self.net.setInput(blob)
-        detections = self.net.forward()
-
         img_stamp = self._stamp_sec(msg)
         items = []
         best_raw_conf = 0.0
         best_raw_cls = "background"
-
-        for i in range(detections.shape[2]):
-          conf = float(detections[0, 0, i, 2])
-          cls_id = int(detections[0, 0, i, 1])
-          if 0 <= cls_id < len(CLASSES) and conf > best_raw_conf:
-            best_raw_conf = conf
-            best_raw_cls = CLASSES[cls_id]
-
-          if conf < self.min_conf:
-            continue
-
-          if cls_id < 0 or cls_id >= len(CLASSES):
-            continue
-
-          box = detections[0, 0, i, 3:7] * np.array([w, h, w, h])
-          x1, y1, x2, y2 = box.astype("int")
-          x1 = max(0, min(w - 1, x1))
-          x2 = max(0, min(w - 1, x2))
-          y1 = max(0, min(h - 1, y1))
-          y2 = max(0, min(h - 1, y2))
-          if x2 <= x1 or y2 <= y1:
-            continue
-
-          depth_m = self._bbox_depth_m(x1, y1, x2, y2, img_stamp)
-          label = f"{CLASSES[cls_id]} {conf:.2f}"
-          if depth_m is not None:
-            label += f" {depth_m:.2f}m"
-
-          cv2.rectangle(frame, (x1, y1), (x2, y2), (40, 220, 40), 2)
-          cv2.putText(frame, label, (x1, max(16, y1 - 8)), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (40, 220, 40), 2)
-
-          items.append(
-            {
-              "class_id": cls_id,
-              "class_name": CLASSES[cls_id],
-              "confidence": round(conf, 4),
-              "bbox_xyxy": [int(x1), int(y1), int(x2), int(y2)],
-              "depth_m": round(float(depth_m), 3) if depth_m is not None else None,
-            }
-          )
-
+    
+        if self.net is not None:
+          blob = cv2.dnn.blobFromImage(cv2.resize(frame, (300, 300)), 0.007843, (300, 300), 127.5)
+          self.net.setInput(blob)
+          detections = self.net.forward()
+    
+          for i in range(detections.shape[2]):
+            conf = float(detections[0, 0, i, 2])
+            cls_id = int(detections[0, 0, i, 1])
+            if 0 <= cls_id < len(CLASSES) and conf > best_raw_conf:
+              best_raw_conf = conf
+              best_raw_cls = CLASSES[cls_id]
+    
+            if conf < self.min_conf:
+              continue
+    
+            if cls_id < 0 or cls_id >= len(CLASSES):
+              continue
+    
+            box = detections[0, 0, i, 3:7] * np.array([w, h, w, h])
+            x1, y1, x2, y2 = box.astype("int")
+            x1 = max(0, min(w - 1, x1))
+            x2 = max(0, min(w - 1, x2))
+            y1 = max(0, min(h - 1, y1))
+            y2 = max(0, min(h - 1, y2))
+            if x2 <= x1 or y2 <= y1:
+              continue
+      
+            depth_m = self._bbox_depth_m(x1, y1, x2, y2, img_stamp)
+            label = f"{CLASSES[cls_id]} {conf:.2f}"
+            if depth_m is not None:
+              label += f" {depth_m:.2f}m"
+      
+            cv2.rectangle(frame, (x1, y1), (x2, y2), (40, 220, 40), 2)
+            cv2.putText(frame, label, (x1, max(16, y1 - 8)), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (40, 220, 40), 2)
+      
+            items.append(
+              {
+                "class_id": cls_id,
+                "class_name": CLASSES[cls_id],
+                "confidence": round(conf, 4),
+                "bbox_xyxy": [int(x1), int(y1), int(x2), int(y2)],
+                "depth_m": round(float(depth_m), 3) if depth_m is not None else None,
+              }
+            )
+    
         if not items and self.enable_generic_fallback:
           for score, (x1, y1, x2, y2) in self._generic_object_boxes(frame):
             depth_m = self._bbox_depth_m(x1, y1, x2, y2, img_stamp)
@@ -276,11 +280,11 @@ data:
                 "depth_m": round(float(depth_m), 3) if depth_m is not None else None,
               }
             )
-
+    
         out_img = self.bridge.cv2_to_imgmsg(frame, encoding="bgr8")
         out_img.header = msg.header
         self.image_pub.publish(out_img)
-
+    
         payload = {
           "stamp": {
             "sec": int(msg.header.stamp.sec),
@@ -294,15 +298,15 @@ data:
         out = String()
         out.data = json.dumps(payload, ensure_ascii=False)
         self.json_pub.publish(out)
-
+    
         self._frames_inferred += 1
         if now - self._last_log_wall >= 5.0:
           self._last_log_wall = now
           self.get_logger().info(
             f"frames_seen={self._frames_seen} inferred={self._frames_inferred} dets={len(items)} best={best_raw_cls}:{best_raw_conf:.3f}"
           )
-
-
+    
+    
     def main():
       rclpy.init()
       node = MobileNetSSD2D()
@@ -311,11 +315,11 @@ data:
       finally:
         node.destroy_node()
         rclpy.shutdown()
-
-
+    
+    
     if __name__ == "__main__":
       main()
-
+    
   run-2d.sh: |
     #!/usr/bin/env bash
     set -eo pipefail
@@ -367,6 +371,14 @@ spec:
               value: "0.5"
             - name: DEFAULT_BASELINE_M
               value: "0.0920869537"
+            - name: ENABLE_DNN
+              value: "0"
+            - name: ENABLE_GENERIC_FALLBACK
+              value: "1"
+            - name: FALLBACK_MAX_BOXES
+              value: "3"
+            - name: FALLBACK_MIN_AREA_RATIO
+              value: "0.015"
           command: ["bash", "-lc"]
           args:
             - |
