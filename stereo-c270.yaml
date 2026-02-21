@@ -7,7 +7,7 @@ data:
     /**:
       ros__parameters:
         video_device: "__LEFT_VIDEO_DEVICE__"
-        framerate: 10.0
+        framerate: 8.0
         io_method: "mmap"
         frame_id: "stereo_left_optical_frame"
         pixel_format: "mjpeg2rgb"
@@ -21,7 +21,7 @@ data:
     /**:
       ros__parameters:
         video_device: "__RIGHT_VIDEO_DEVICE__"
-        framerate: 10.0
+        framerate: 8.0
         io_method: "mmap"
         frame_id: "stereo_right_optical_frame"
         pixel_format: "mjpeg2rgb"
