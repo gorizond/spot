@@ -209,6 +209,8 @@ spec:
           env:
             - name: PYTHONUNBUFFERED
               value: "1"
+            - name: RSP_PUBLISH_FREQUENCY
+              value: "40.0"
           command: ["bash", "-lc"]
           args:
             - |
@@ -229,13 +231,27 @@ spec:
                 fi
               fi
 
-              exec ros2 launch champ_bringup bringup.launch.py \
+              RSP_PUBLISH_FREQUENCY="${RSP_PUBLISH_FREQUENCY:-40.0}"
+              echo "[spot-champ] target /robot_state_publisher publish_frequency=${RSP_PUBLISH_FREQUENCY}"
+
+              ros2 launch champ_bringup bringup.launch.py \
                 rviz:=false use_sim_time:=false gazebo:=false \
                 description_path:=/opt/spot/champ/spotmicroai.urdf.xacro \
                 joints_map_path:=/opt/spot/champ/joints_ros2.yaml \
                 links_map_path:=/opt/spot/champ/links_ros2.yaml \
                 gait_config_path:=/opt/spot/champ/gait_ros2.yaml \
-                publish_joint_states:=true publish_joint_control:=false
+                publish_joint_states:=true publish_joint_control:=false &
+              LAUNCH_PID=$!
+
+              for _ in $(seq 1 60); do
+                if ros2 param set /robot_state_publisher publish_frequency "${RSP_PUBLISH_FREQUENCY}" >/tmp/rsp_param_set.log 2>&1; then
+                  echo "[spot-champ] publish_frequency set to ${RSP_PUBLISH_FREQUENCY}"
+                  break
+                fi
+                sleep 2
+              done
+
+              wait "${LAUNCH_PID}"
           resources:
             requests:
               cpu: "300m"
