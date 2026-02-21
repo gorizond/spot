@@ -7,7 +7,7 @@ data:
     /**:
       ros__parameters:
         video_device: "__LEFT_VIDEO_DEVICE__"
-        framerate: 15.0
+        framerate: 10.0
         io_method: "mmap"
         frame_id: "stereo_left_optical_frame"
         pixel_format: "mjpeg2rgb"
@@ -21,7 +21,7 @@ data:
     /**:
       ros__parameters:
         video_device: "__RIGHT_VIDEO_DEVICE__"
-        framerate: 15.0
+        framerate: 10.0
         io_method: "mmap"
         frame_id: "stereo_right_optical_frame"
         pixel_format: "mjpeg2rgb"
@@ -311,10 +311,6 @@ data:
       --remap __ns:=/${STEREO_NAMESPACE}/left \
       --params-file /tmp/spot-stereo/usb_cam_left.yaml
 
-    start_bg python3 /config/camera_info_restamp_side.py \
-      --namespace "${STEREO_NAMESPACE}" \
-      --side left
-
     # image_proc stays disabled: rectification nodes require exact image/camera_info timestamp sync
     # that usb_cam does not guarantee for C270 in this setup; stereo core uses image_raw + approximate sync.
 
@@ -406,10 +402,6 @@ data:
       --remap __ns:=/${STEREO_NAMESPACE}/right \
       --params-file /tmp/spot-stereo/usb_cam_right.yaml
 
-    start_bg python3 /config/camera_info_restamp_side.py \
-      --namespace "${STEREO_NAMESPACE}" \
-      --side right
-
     # image_proc stays disabled: rectification nodes require exact image/camera_info timestamp sync
     # that usb_cam does not guarantee for C270 in this setup; stereo core uses image_raw + approximate sync.
 
@@ -451,8 +443,8 @@ data:
       -p approximate_sync_tolerance_seconds:=${APPROX_SYNC_TOLERANCE} \
       -p queue_size:=20 \
       -p disparity_range:=${DISPARITY_RANGE} \
-      --remap left/camera_info:=/${STEREO_NAMESPACE}/left/camera_info_sync \
-      --remap right/camera_info:=/${STEREO_NAMESPACE}/right/camera_info_sync \
+      --remap left/camera_info:=/${STEREO_NAMESPACE}/left/camera_info \
+      --remap right/camera_info:=/${STEREO_NAMESPACE}/right/camera_info \
       --remap left/image_rect:=/${STEREO_NAMESPACE}/left/image_raw \
       --remap right/image_rect:=/${STEREO_NAMESPACE}/right/image_raw
 
@@ -463,8 +455,8 @@ data:
       -p queue_size:=20 \
       -p avoid_point_cloud_padding:=true \
       --remap disparity:=/${STEREO_NAMESPACE}/disparity \
-      --remap left/camera_info:=/${STEREO_NAMESPACE}/left/camera_info_sync \
-      --remap right/camera_info:=/${STEREO_NAMESPACE}/right/camera_info_sync \
+      --remap left/camera_info:=/${STEREO_NAMESPACE}/left/camera_info \
+      --remap right/camera_info:=/${STEREO_NAMESPACE}/right/camera_info \
       --remap left/image_rect_color:=/${STEREO_NAMESPACE}/left/image_raw
 
     cleanup() {

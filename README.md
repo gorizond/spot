@@ -152,13 +152,13 @@ Quick troubleshooting (field checklist):
 
 `spot-stereo-c270` is deployed via `stereo-c270.yaml` as **three DaemonSets** (one pod each on labeled robot nodes):
 
-- `spot-stereo-c270-left`: left `usb_cam` + `camera_info_restamp_side.py --side left`
-- `spot-stereo-c270-right`: right `usb_cam` + `camera_info_restamp_side.py --side right`
+- `spot-stereo-c270-left`: left `usb_cam` (10 FPS)
+- `spot-stereo-c270-right`: right `usb_cam` (10 FPS)
 - `spot-stereo-c270-core`: `stereo_image_proc` (`disparity_node` + `point_cloud_node`)
 - image: `ghcr.io/gorizond/spot-stereo-c270:latest`
 - runtime: ROS 2 Kilted
 - sync mode: `approximate_sync=true` (default tolerance `0.35s`)
-- clean timestamp fix: `camera_info_restamp_side.py` publishes `/stereo/{left,right}/camera_info_sync` with `camera_info.header.stamp == image_raw.header.stamp`
+- camera info source: native `/stereo/{left,right}/camera_info` from `usb_cam`
 - node label gate: `gorizond.io/spot-stereo=true`
 - DDS runtime: `RMW_IMPLEMENTATION=rmw_cyclonedds_cpp`
 
@@ -173,7 +173,6 @@ Published topics (namespace `stereo`):
 
 - `/stereo/left/image_raw`, `/stereo/right/image_raw`
 - `/stereo/left/camera_info`, `/stereo/right/camera_info`
-- `/stereo/left/camera_info_sync`, `/stereo/right/camera_info_sync`
 - `/stereo/disparity`
 - `/stereo/points2`
 
