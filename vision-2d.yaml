@@ -376,9 +376,9 @@ spec:
             - name: ENABLE_GENERIC_FALLBACK
               value: "1"
             - name: FALLBACK_MAX_BOXES
-              value: "3"
+              value: "2"
             - name: FALLBACK_MIN_AREA_RATIO
-              value: "0.015"
+              value: "0.02"
           command: ["bash", "-lc"]
           args:
             - |

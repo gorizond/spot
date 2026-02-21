@@ -260,7 +260,7 @@ spec:
             - name: CHAMP_HIP_SIGN
               value: "-1.0"
             - name: CHAMP_BRIDGE_HZ
-              value: "10"
+              value: "8"
             - name: STAND_HIP
               value: "0.00"
             - name: STAND_UPPER
