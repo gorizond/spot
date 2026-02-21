@@ -421,8 +421,8 @@ data:
     source /opt/ros/kilted/setup.bash
 
     STEREO_NAMESPACE="${STEREO_NAMESPACE:-stereo}"
-    APPROX_SYNC_TOLERANCE="${APPROX_SYNC_TOLERANCE:-0.25}"
-    POINTCLOUD_SYNC_TOLERANCE="${POINTCLOUD_SYNC_TOLERANCE:-0.25}"
+    APPROX_SYNC_TOLERANCE="${APPROX_SYNC_TOLERANCE:-0.35}"
+    POINTCLOUD_SYNC_TOLERANCE="${POINTCLOUD_SYNC_TOLERANCE:-0.35}"
     DISPARITY_RANGE="${DISPARITY_RANGE:-128}"
 
     echo "[spot-stereo-c270-core] STEREO_NAMESPACE=${STEREO_NAMESPACE}"
@@ -441,7 +441,7 @@ data:
       --remap __ns:=/${STEREO_NAMESPACE} \
       -p approximate_sync:=true \
       -p approximate_sync_tolerance_seconds:=${APPROX_SYNC_TOLERANCE} \
-      -p queue_size:=10 \
+      -p queue_size:=20 \
       -p disparity_range:=${DISPARITY_RANGE} \
       --remap left/camera_info:=/${STEREO_NAMESPACE}/left/camera_info \
       --remap right/camera_info:=/${STEREO_NAMESPACE}/right/camera_info \
@@ -452,7 +452,7 @@ data:
       --remap __ns:=/${STEREO_NAMESPACE} \
       -p approximate_sync:=true \
       -p approximate_sync_tolerance_seconds:=${POINTCLOUD_SYNC_TOLERANCE} \
-      -p queue_size:=10 \
+      -p queue_size:=20 \
       -p avoid_point_cloud_padding:=true \
       --remap disparity:=/${STEREO_NAMESPACE}/disparity \
       --remap left/camera_info:=/${STEREO_NAMESPACE}/left/camera_info \
@@ -634,9 +634,9 @@ spec:
             - name: STEREO_NAMESPACE
               value: "stereo"
             - name: APPROX_SYNC_TOLERANCE
-              value: "0.25"
+              value: "0.35"
             - name: POINTCLOUD_SYNC_TOLERANCE
-              value: "0.25"
+              value: "0.35"
             - name: DISPARITY_RANGE
               value: "128"
           command: ["bash", "-lc"]
