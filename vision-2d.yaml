@@ -366,7 +366,7 @@ spec:
             - name: MIN_CONF
               value: "0.25"
             - name: DETECT_FPS
-              value: "2.0"
+              value: "1.0"
             - name: MAX_DISP_LAG_S
               value: "0.5"
             - name: DEFAULT_BASELINE_M
